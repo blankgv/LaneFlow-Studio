@@ -32,6 +32,7 @@ export class AuthSessionService {
   readonly isAuthenticated = computed(() => this.session() !== null);
 
   readonly token = computed(() => this.session()?.token ?? null);
+  readonly permissions = computed(() => this.session()?.permissions ?? []);
 
   login(credentials: LoginCredentials): Observable<AuthSession> {
     return this.authApi.login(credentials).pipe(
@@ -53,6 +54,14 @@ export class AuthSessionService {
   clearSession(): void {
     this.sessionState.set(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.permissions().includes(permission);
+  }
+
+  hasAllPermissions(permissions: string[]): boolean {
+    return permissions.every((permission) => this.hasPermission(permission));
   }
 
   private persistSession(session: AuthSession): void {

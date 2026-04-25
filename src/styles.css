@@ -1,18 +1,59 @@
 @import "@angular/material/prebuilt-themes/indigo-pink.css";
 
 :root {
-  --color-bg: #f2f4f6;
-  --color-surface: #ffffff;
-  --color-card: #ffffff;
-  --color-text: #172033;
-  --color-muted: #5e6b82;
-  --color-primary: #6c8586;
-  --color-primary-strong: #5a7172;
-  --color-accent: #cbb7ae;
-  --color-border: rgba(23, 32, 51, 0.08);
-  --shadow-soft: 0 18px 38px rgba(23, 32, 51, 0.06);
-  --radius-lg: 24px;
-  --radius-md: 16px;
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eef0f3;
+  --surface-hover: #f1f3f6;
+
+  /* Borders */
+  --border: #e6e8ec;
+  --border-strong: #d3d7dd;
+
+  /* Text */
+  --text: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-subtle: #9ca3af;
+
+  /* Accent (single brand color) */
+  --accent: #0a7a6c;
+  --accent-strong: #075d53;
+  --accent-soft: rgba(10, 122, 108, 0.08);
+  --accent-soft-strong: rgba(10, 122, 108, 0.14);
+
+  /* Status */
+  --danger: #b91c1c;
+  --danger-soft: rgba(185, 28, 28, 0.08);
+  --warning: #b45309;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow-lg: 0 8px 24px rgba(17, 24, 39, 0.08);
+
+  /* Type */
+  --font-sans: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Backwards-compat aliases (kept so legacy components keep working) */
+  --color-bg: var(--surface-2);
+  --color-surface: var(--surface);
+  --color-card: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-primary: var(--accent);
+  --color-primary-strong: var(--accent-strong);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --shadow-soft: var(--shadow);
+  --radius-md: var(--radius-lg);
 }
 
 * {
@@ -23,18 +64,15 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  font-family: Inter, "Segoe UI", sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text);
+  font-family: var(--font-sans);
+  background: var(--surface-2);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   min-height: 100vh;
-}
-
-body .mat-mdc-unelevated-button.mat-primary {
-  --mdc-filled-button-container-color: var(--color-primary);
-  --mdc-filled-button-label-text-color: #ffffff;
 }
 
 button,
@@ -44,6 +82,11 @@ textarea {
   font: inherit;
 }
 
+body .mat-mdc-unelevated-button.mat-primary {
+  --mdc-filled-button-container-color: var(--accent);
+  --mdc-filled-button-label-text-color: #ffffff;
+}
+
 .page-shell {
   max-width: 1280px;
   margin: 0 auto;
@@ -51,8 +94,176 @@ textarea {
 }
 
 .card {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* Shared admin table styling */
+.data-table {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.data-table__wrap {
+  overflow-x: auto;
+}
+
+.data-table table.mat-mdc-table {
+  width: 100%;
+  background: transparent;
+}
+
+.data-table .mat-mdc-header-row {
+  background: var(--surface-2);
+  min-height: 40px;
+}
+
+.data-table .mat-mdc-row {
+  background: var(--surface);
+  min-height: 48px;
+  transition: background 120ms ease;
+}
+
+.data-table .mat-mdc-row:hover {
+  background: var(--surface-hover);
+}
+
+.data-table .mat-mdc-header-cell {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+}
+
+.data-table .mat-mdc-cell {
+  font-size: 0.86rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+}
+
+.data-table .mat-mdc-row:last-child .mat-mdc-cell {
+  border-bottom: 0;
+}
+
+.data-table .stack-cell strong,
+.data-table .stack-cell span {
+  display: block;
+}
+
+.data-table .stack-cell strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.data-table .stack-cell span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.data-table__state {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.data-table__state mat-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+  color: var(--text-subtle);
+}
+
+.data-table__state strong {
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.data-table__actions {
+  white-space: nowrap;
+  text-align: right;
+  width: 1%;
+}
+
+.data-table__actions .mat-mdc-icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  line-height: 32px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.data-table__actions .mat-mdc-icon-button:hover {
+  color: var(--text);
+}
+
+.data-table__actions .mat-mdc-icon-button.mat-warn {
+  color: var(--text-muted);
+}
+
+.data-table__actions .mat-mdc-icon-button.mat-warn:hover {
+  color: var(--danger);
+}
+
+.data-table__actions .mat-mdc-icon-button .mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+/* Page layout shared by admin list pages */
+.admin-page {
+  padding: 24px 28px;
+  max-width: 1280px;
+}
+
+.admin-page__alert {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.86rem;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+}
+
+.admin-page__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-page__toolbar .mat-mdc-unelevated-button {
+  height: 36px;
+  border-radius: var(--radius);
+}
+
+.admin-page__toolbar .mat-mdc-unelevated-button .mat-icon {
+  margin-right: 6px;
+}
+
+@media (max-width: 720px) {
+  .admin-page {
+    padding: 18px 18px;
+  }
 }

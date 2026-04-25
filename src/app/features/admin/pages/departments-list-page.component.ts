@@ -1,6 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
@@ -15,29 +18,35 @@ import { AdminDepartmentsService } from '../services/admin-departments.service';
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
     AdminPageHeaderComponent,
     AdminSearchBarComponent,
     DepartmentsTableComponent
   ],
   template: `
-    <section class="page-wrap">
+    <section class="admin-page">
       <app-admin-page-header
-        eyebrow="Departamentos"
-        title="Gestionar departamentos"
-        description="Organiza la estructura base de la institucion con areas principales y relaciones jerarquicas simples."
-        actionLabel="Nuevo departamento"
-        [actionLink]="canWrite ? ['/admin/departments/new'] : null"
-        actionIcon="apartment"
+        title="Departamentos"
+        description="Organiza la estructura base con areas y dependencias jerarquicas."
       />
 
-      <div class="page-alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
+      <div class="admin-page__alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
 
-      <app-admin-search-bar
-        label="Buscar departamento"
-        placeholder="Codigo, nombre o descripcion"
-        [value]="searchTerm()"
-        (valueChange)="searchTerm.set($event)"
-      />
+      <div class="admin-page__toolbar">
+        <app-admin-search-bar
+          label="Buscar departamento"
+          placeholder="Codigo, nombre o descripcion"
+          [value]="searchTerm()"
+          (valueChange)="searchTerm.set($event)"
+        />
+
+        <a *ngIf="canWrite" mat-flat-button color="primary" [routerLink]="['/admin/departments/new']">
+          <mat-icon>apartment</mat-icon>
+          Nuevo departamento
+        </a>
+      </div>
 
       <app-departments-table
         [departments]="filteredDepartments()"
@@ -46,26 +55,7 @@ import { AdminDepartmentsService } from '../services/admin-departments.service';
         (deactivate)="onDeactivate($event)"
       />
     </section>
-  `,
-  styles: [`
-    .page-wrap {
-      padding: 28px;
-    }
-
-    .page-alert {
-      margin-bottom: 18px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: rgba(211, 47, 47, 0.08);
-      color: #b3261e;
-    }
-
-    @media (max-width: 720px) {
-      .page-wrap {
-        padding: 20px;
-      }
-    }
-  `]
+  `
 })
 export class DepartmentsListPageComponent {
   private readonly departmentsService = inject(AdminDepartmentsService);

@@ -23,7 +23,6 @@ import { AdminUsersService } from '../services/admin-users.service';
   template: `
     <section class="page-wrap">
       <app-admin-page-header
-        eyebrow="Usuarios"
         [title]="isEditMode() ? 'Editar usuario' : 'Nuevo usuario'"
         [description]="
           isEditMode()

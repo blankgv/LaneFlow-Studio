@@ -5,6 +5,8 @@ import { permissionGuard } from '../../core/guards/permission.guard';
 import { AdminShellComponent } from './components/admin-shell/admin-shell.component';
 import { DepartmentFormPageComponent } from './pages/department-form-page.component';
 import { DepartmentsListPageComponent } from './pages/departments-list-page.component';
+import { RoleFormPageComponent } from './pages/role-form-page.component';
+import { RolesListPageComponent } from './pages/roles-list-page.component';
 import { StaffFormPageComponent } from './pages/staff-form-page.component';
 import { StaffListPageComponent } from './pages/staff-list-page.component';
 
@@ -66,6 +68,30 @@ export const ADMIN_ROUTES: Routes = [
           permissions: ['STAFF_WRITE']
         },
         component: StaffFormPageComponent
+      },
+      {
+        path: 'roles',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['ROLE_READ']
+        },
+        component: RolesListPageComponent
+      },
+      {
+        path: 'roles/new',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['ROLE_WRITE']
+        },
+        component: RoleFormPageComponent
+      },
+      {
+        path: 'roles/:id/edit',
+        canActivate: [permissionGuard],
+        data: {
+          permissions: ['ROLE_WRITE']
+        },
+        component: RoleFormPageComponent
       }
     ]
   }

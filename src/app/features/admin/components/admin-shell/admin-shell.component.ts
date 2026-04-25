@@ -31,8 +31,12 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
             <mat-icon>badge</mat-icon>
             <span>Personal</span>
           </a>
+          <a routerLink="/admin/roles" routerLinkActive="active">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <span>Roles y permisos</span>
+          </a>
           <div class="module-nav__coming-soon">
-            <span>Usuarios y roles se integraran en los siguientes casos.</span>
+            <span>Usuarios se integraran en el siguiente caso de uso.</span>
           </div>
         </nav>
 

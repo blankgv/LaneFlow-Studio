@@ -1,10 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AdminPageHeaderComponent } from '../components/admin-page-header/admin-page-header.component';
+import { AdminSearchBarComponent } from '../components/admin-search-bar/admin-search-bar.component';
 import { UsersTableComponent } from '../components/users-table/users-table.component';
 import { User } from '../models/user.model';
 import { AdminUsersService } from '../services/admin-users.service';
@@ -12,7 +13,7 @@ import { AdminUsersService } from '../services/admin-users.service';
 @Component({
   selector: 'app-users-list-page',
   standalone: true,
-  imports: [CommonModule, AdminPageHeaderComponent, UsersTableComponent],
+  imports: [CommonModule, AdminPageHeaderComponent, AdminSearchBarComponent, UsersTableComponent],
   template: `
     <section class="page-wrap">
       <app-admin-page-header
@@ -26,8 +27,15 @@ import { AdminUsersService } from '../services/admin-users.service';
 
       <div class="page-alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
 
+      <app-admin-search-bar
+        label="Buscar usuario"
+        placeholder="Usuario, correo, personal o rol"
+        [value]="searchTerm()"
+        (valueChange)="searchTerm.set($event)"
+      />
+
       <app-users-table
-        [users]="users()"
+        [users]="filteredUsers()"
         [loading]="loading()"
         [canManage]="canWrite"
         (deactivate)="onDeactivate($event)"
@@ -61,7 +69,26 @@ export class UsersListPageComponent {
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
   protected readonly users = signal<User[]>([]);
+  protected readonly searchTerm = signal('');
   protected readonly canWrite = this.authSession.hasPermission('USER_WRITE');
+  protected readonly filteredUsers = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+
+    if (!term) {
+      return this.users();
+    }
+
+    return this.users().filter((item) =>
+      [
+        item.username,
+        item.email,
+        item.staffCode ?? '',
+        item.staffFullName ?? '',
+        item.roleCode,
+        item.roleName
+      ].some((value) => value.toLowerCase().includes(term))
+    );
+  });
 
   constructor() {
     this.loadUsers();

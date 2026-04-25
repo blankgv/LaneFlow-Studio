@@ -1,10 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AdminPageHeaderComponent } from '../components/admin-page-header/admin-page-header.component';
+import { AdminSearchBarComponent } from '../components/admin-search-bar/admin-search-bar.component';
 import { RolesTableComponent } from '../components/roles-table/roles-table.component';
 import { Role } from '../models/role.model';
 import { AdminRolesService } from '../services/admin-roles.service';
@@ -12,7 +13,7 @@ import { AdminRolesService } from '../services/admin-roles.service';
 @Component({
   selector: 'app-roles-list-page',
   standalone: true,
-  imports: [CommonModule, AdminPageHeaderComponent, RolesTableComponent],
+  imports: [CommonModule, AdminPageHeaderComponent, AdminSearchBarComponent, RolesTableComponent],
   template: `
     <section class="page-wrap">
       <app-admin-page-header
@@ -26,8 +27,15 @@ import { AdminRolesService } from '../services/admin-roles.service';
 
       <div class="page-alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
 
+      <app-admin-search-bar
+        label="Buscar rol"
+        placeholder="Codigo, nombre, descripcion o permiso"
+        [value]="searchTerm()"
+        (valueChange)="searchTerm.set($event)"
+      />
+
       <app-roles-table
-        [roles]="roles()"
+        [roles]="filteredRoles()"
         [loading]="loading()"
         [canManage]="canWrite"
         (deactivate)="onDeactivate($event)"
@@ -61,7 +69,21 @@ export class RolesListPageComponent {
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
   protected readonly roles = signal<Role[]>([]);
+  protected readonly searchTerm = signal('');
   protected readonly canWrite = this.authSession.hasPermission('ROLE_WRITE');
+  protected readonly filteredRoles = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+
+    if (!term) {
+      return this.roles();
+    }
+
+    return this.roles().filter((item) =>
+      [item.code, item.name, item.description ?? '', ...item.permissions].some((value) =>
+        value.toLowerCase().includes(term)
+      )
+    );
+  });
 
   constructor() {
     this.loadRoles();

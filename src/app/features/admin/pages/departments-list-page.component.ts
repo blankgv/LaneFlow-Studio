@@ -1,10 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AdminPageHeaderComponent } from '../components/admin-page-header/admin-page-header.component';
+import { AdminSearchBarComponent } from '../components/admin-search-bar/admin-search-bar.component';
 import { DepartmentsTableComponent } from '../components/departments-table/departments-table.component';
 import { DepartmentOption } from '../models/department-option.model';
 import { AdminDepartmentsService } from '../services/admin-departments.service';
@@ -12,7 +13,12 @@ import { AdminDepartmentsService } from '../services/admin-departments.service';
 @Component({
   selector: 'app-departments-list-page',
   standalone: true,
-  imports: [CommonModule, AdminPageHeaderComponent, DepartmentsTableComponent],
+  imports: [
+    CommonModule,
+    AdminPageHeaderComponent,
+    AdminSearchBarComponent,
+    DepartmentsTableComponent
+  ],
   template: `
     <section class="page-wrap">
       <app-admin-page-header
@@ -26,8 +32,15 @@ import { AdminDepartmentsService } from '../services/admin-departments.service';
 
       <div class="page-alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
 
+      <app-admin-search-bar
+        label="Buscar departamento"
+        placeholder="Codigo, nombre o descripcion"
+        [value]="searchTerm()"
+        (valueChange)="searchTerm.set($event)"
+      />
+
       <app-departments-table
-        [departments]="departments()"
+        [departments]="filteredDepartments()"
         [loading]="loading()"
         [canManage]="canWrite"
         (deactivate)="onDeactivate($event)"
@@ -61,7 +74,21 @@ export class DepartmentsListPageComponent {
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
   protected readonly departments = signal<DepartmentOption[]>([]);
+  protected readonly searchTerm = signal('');
   protected readonly canWrite = this.authSession.hasPermission('DEPT_WRITE');
+  protected readonly filteredDepartments = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+
+    if (!term) {
+      return this.departments();
+    }
+
+    return this.departments().filter((item) =>
+      [item.code, item.name, item.description ?? ''].some((value) =>
+        value.toLowerCase().includes(term)
+      )
+    );
+  });
 
   constructor() {
     this.loadDepartments();

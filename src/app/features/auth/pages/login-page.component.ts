@@ -92,7 +92,9 @@ export class LoginPageComponent {
 
     this.authSession.login(credentials).subscribe({
       next: () => {
-        void this.router.navigate(['/auth/session']);
+        void this.router.navigate(
+          this.authSession.hasPermission('STAFF_READ') ? ['/admin/staff'] : ['/auth/session']
+        );
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;

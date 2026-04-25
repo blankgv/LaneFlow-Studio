@@ -1,51 +1,27 @@
-import { Component } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+
+import {
+  FeatureCardItem,
+  FeatureCarouselComponent
+} from '../feature-carousel/feature-carousel.component';
 
 @Component({
   selector: 'app-auth-hero',
   standalone: true,
-  imports: [MatIconModule],
+  imports: [FeatureCarouselComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="hero-panel">
-      <div class="hero-header">
-        <span class="eyebrow">LaneFlow Studio</span>
-      </div>
-
-      <div class="visual-stage">
-        <div class="floating-card primary-card">
-          <mat-icon>timeline</mat-icon>
-          <div>
-            <strong>Flujos y tramites</strong>
-            <small>Disena, ejecuta y supervisa procesos de principio a fin.</small>
-          </div>
+      <header class="hero-panel__header">
+        <div class="brand-badge">
+          <span class="brand-badge__logo">LF</span>
+          <span class="brand-badge__name">LaneFlow Studio</span>
         </div>
+      </header>
 
-        <div class="floating-card secondary-card">
-          <mat-icon>auto_awesome</mat-icon>
-          <div>
-            <strong>Integracion de IA</strong>
-            <small>Asistencia para construir y optimizar procesos.</small>
-          </div>
-        </div>
+      <app-feature-carousel [items]="features" />
 
-        <div class="floating-card accent-card">
-          <mat-icon>device_hub</mat-icon>
-          <div>
-            <strong>Diagramas claros</strong>
-            <small>Modelado visual simple para flujos operativos.</small>
-          </div>
-        </div>
-
-        <div class="floating-card analytics-card">
-          <mat-icon>monitoring</mat-icon>
-          <div>
-            <strong>Analitica operativa</strong>
-            <small>Deteccion temprana de cuellos de botella y demoras.</small>
-          </div>
-        </div>
-      </div>
-
-      <div class="hero-copy">
+      <div class="hero-panel__copy">
         <h1>Bienvenido de nuevo</h1>
         <p>
           LaneFlow centraliza la operacion interna de la organizacion con una
@@ -59,13 +35,14 @@ import { MatIconModule } from '@angular/material/icon';
       position: relative;
       overflow: hidden;
       min-height: 100%;
-      padding: 24px;
+      padding: 28px 24px;
       border-radius: 22px;
       background:
         radial-gradient(circle at top right, rgba(255, 255, 255, 0.08), transparent 24%),
         linear-gradient(180deg, #4b69b6 0%, #3f5ead 100%);
       color: #f6f7fb;
       display: grid;
+      grid-template-rows: auto 1fr auto;
       gap: 18px;
       box-shadow: 0 16px 32px rgba(63, 94, 173, 0.18);
     }
@@ -80,118 +57,63 @@ import { MatIconModule } from '@angular/material/icon';
       background: rgba(255, 255, 255, 0.05);
     }
 
-    .hero-copy {
-      position: relative;
-      z-index: 1;
-      max-width: 300px;
-    }
-
-    .hero-header {
+    .hero-panel__header {
       position: relative;
       z-index: 1;
       display: flex;
-      justify-content: center;
-      padding-top: 14px;
-      padding-bottom: 14px;
     }
 
-    .eyebrow {
+    .brand-badge {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      width: fit-content;
-      padding: 0 18px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12);
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      line-height: 1;
-      text-align: center;
+      gap: 10px;
     }
 
-    .visual-stage {
+    .brand-badge__logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: #f0b45a;
+      color: #1d2433;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 3px 10px rgba(240, 180, 90, 0.35);
+    }
+
+    .brand-badge__name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      opacity: 0.92;
+    }
+
+    app-feature-carousel {
       position: relative;
       z-index: 1;
-      height: 264px;
-      border-radius: 18px;
-      margin-top: 4px;
+      align-self: center;
+      width: 100%;
     }
 
-    .floating-card {
-      position: absolute;
-      display: grid;
-      grid-template-columns: 20px 1fr;
-      align-items: start;
-      gap: 10px;
-      width: 178px;
-      padding: 12px 13px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.94);
-      color: #2f3d60;
-      box-shadow: 0 14px 30px rgba(33, 52, 99, 0.18);
+    .hero-panel__copy {
+      position: relative;
+      z-index: 1;
+      max-width: 320px;
     }
 
-    .primary-card {
-      left: 14px;
-      top: 18px;
-      transform: rotate(-8deg);
-    }
-
-    .secondary-card {
-      right: 6px;
-      top: 18px;
-      transform: rotate(7deg);
-    }
-
-    .accent-card {
-      left: 22px;
-      bottom: 16px;
-      transform: rotate(-4deg);
-    }
-
-    .analytics-card {
-      right: 10px;
-      bottom: 20px;
-      transform: rotate(4deg);
-    }
-
-    .floating-card strong,
-    .floating-card small {
-      display: block;
-    }
-
-    .floating-card strong {
-      margin-bottom: 8px;
-      font-size: 0.8rem;
-      line-height: 1.2;
-      color: #2f3d60;
-    }
-
-    .floating-card small {
-      color: #66748f;
-      line-height: 1.35;
-      font-size: 0.68rem;
-    }
-
-    .floating-card mat-icon {
-      width: 18px;
-      height: 18px;
-      font-size: 18px;
-      color: #4b69b6;
-    }
-
-    h1 {
+    .hero-panel__copy h1 {
       margin: 0 0 10px;
       font-size: clamp(1.5rem, 2vw, 2.1rem);
       line-height: 1.06;
     }
 
-    p {
+    .hero-panel__copy p {
       margin: 0;
-      max-width: 30ch;
+      max-width: 32ch;
       font-size: 0.86rem;
       line-height: 1.58;
       color: rgba(244, 247, 251, 0.8);
@@ -201,16 +123,38 @@ import { MatIconModule } from '@angular/material/icon';
       .hero-panel {
         padding: 22px;
       }
-
-      .visual-stage {
-        height: 320px;
-      }
-
-      .hero-header {
-        padding-top: 10px;
-        padding-bottom: 10px;
-      }
     }
   `]
 })
-export class AuthHeroComponent {}
+export class AuthHeroComponent {
+  protected readonly features: FeatureCardItem[] = [
+    {
+      icon: 'timeline',
+      title: 'Flujos y tramites',
+      description:
+        'Disena, ejecuta y supervisa procesos de principio a fin con etapas claras y responsables asignados.',
+      badge: 'Procesos'
+    },
+    {
+      icon: 'auto_awesome',
+      title: 'Integracion de IA',
+      description:
+        'Asistencia inteligente para redactar pasos, sugerir validaciones y optimizar cuellos de botella.',
+      badge: 'Copiloto'
+    },
+    {
+      icon: 'device_hub',
+      title: 'Diagramas claros',
+      description:
+        'Modelado visual con bloques reutilizables para representar trayectorias y decisiones del negocio.',
+      badge: 'Visual'
+    },
+    {
+      icon: 'monitoring',
+      title: 'Analitica operativa',
+      description:
+        'Tableros con tiempos de ciclo, demoras y SLA para detectar problemas antes de que escalen.',
+      badge: 'Insights'
+    }
+  ];
+}

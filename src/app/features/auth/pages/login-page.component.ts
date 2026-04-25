@@ -38,8 +38,6 @@ import { AuthSessionService } from '../services/auth-session.service';
     .login-page {
       min-height: 100vh;
       padding: 16px;
-      background:
-        linear-gradient(180deg, #f5f6f8 0%, #eef1f5 100%);
       display: grid;
       place-items: center;
     }
@@ -53,8 +51,9 @@ import { AuthSessionService } from '../services/auth-session.service';
       min-height: 560px;
       border-radius: 24px;
       overflow: hidden;
-      box-shadow: 0 18px 40px rgba(23, 32, 51, 0.08);
-      background: #ffffff;
+      box-shadow: 0 20px 48px rgba(29, 36, 51, 0.1), 0 1px 3px rgba(29, 36, 51, 0.06);
+      background: #fffdf8;
+      border: 1px solid #d7d0c4;
     }
 
     .login-card {
@@ -63,7 +62,7 @@ import { AuthSessionService } from '../services/auth-session.service';
       display: grid;
       align-items: center;
       box-shadow: none;
-      background: #ffffff;
+      background: #fffdf8;
     }
 
     .login-card mat-card-content {
@@ -74,10 +73,11 @@ import { AuthSessionService } from '../services/auth-session.service';
       margin-bottom: 16px;
       padding: 10px 12px;
       border-radius: 10px;
-      background: rgba(90, 118, 189, 0.08);
-      color: #4963a8;
+      background: rgba(10, 122, 108, 0.07);
+      color: #075d53;
       font-size: 0.84rem;
       line-height: 1.5;
+      border: 1px solid rgba(10, 122, 108, 0.14);
     }
 
     @media (max-width: 1080px) {

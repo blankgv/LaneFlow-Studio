@@ -81,12 +81,12 @@ import { LoginCredentials } from '../../models/login-credentials.model';
       width: 48px;
       height: 48px;
       margin: 0 auto 14px;
-      border-radius: 50%;
+      border-radius: 14px;
       display: grid;
       place-items: center;
-      background: #f5f7fb;
-      color: #5a76bd;
-      border: 1px solid rgba(90, 118, 189, 0.08);
+      background: rgba(10, 122, 108, 0.08);
+      color: #0a7a6c;
+      border: 1px solid rgba(10, 122, 108, 0.12);
     }
 
     .form-badge mat-icon {
@@ -103,7 +103,7 @@ import { LoginCredentials } from '../../models/login-credentials.model';
 
     .form-heading p {
       margin: 0;
-      color: #5e6b82;
+      color: #637087;
       line-height: 1.5;
       font-size: 0.86rem;
     }

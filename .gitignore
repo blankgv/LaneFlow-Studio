@@ -7,3 +7,4 @@ src/app/core/config/generated-runtime-config.ts
 .DS_Store
 Thumbs.db
 *.log
+.claude

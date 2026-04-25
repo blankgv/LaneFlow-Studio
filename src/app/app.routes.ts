@@ -1,5 +1,8 @@
 import { Routes } from '@angular/router';
 
+import { guestGuard } from './core/guards/guest.guard';
+import { RecoverAccessPageComponent } from './features/auth/pages/recover-access-page.component';
+import { ResetPasswordPageComponent } from './features/auth/pages/reset-password-page.component';
 import { ShellComponent } from './layout/shell/shell.component';
 
 export const appRoutes: Routes = [
@@ -10,7 +13,7 @@ export const appRoutes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'auth'
+        redirectTo: 'auth/login'
       },
       {
         path: 'auth',
@@ -43,6 +46,16 @@ export const appRoutes: Routes = [
           import('./features/analytics/analytics.routes').then((m) => m.ANALYTICS_ROUTES)
       }
     ]
+  },
+  {
+    path: 'recover-access',
+    canActivate: [guestGuard],
+    component: RecoverAccessPageComponent
+  },
+  {
+    path: 'reset-password',
+    canActivate: [guestGuard],
+    component: ResetPasswordPageComponent
   },
   {
     path: '**',

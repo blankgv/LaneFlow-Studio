@@ -7,40 +7,41 @@ import { MatCardModule } from '@angular/material/card';
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthAccessLayoutComponent } from '../components/auth-access-layout/auth-access-layout.component';
 import { AuthHeroComponent } from '../components/auth-hero/auth-hero.component';
-import { LoginFormComponent } from '../components/login-form/login-form.component';
-import { LoginCredentials } from '../models/login-credentials.model';
-import { AuthSessionService } from '../services/auth-session.service';
+import { ResetPasswordFormComponent } from '../components/reset-password-form/reset-password-form.component';
+import { ResetPasswordRequest } from '../models/reset-password-request.model';
+import { AuthApiService } from '../services/auth-api.service';
 
 @Component({
-  selector: 'app-login-page',
+  selector: 'app-reset-password-page',
   standalone: true,
   imports: [
     CommonModule,
     MatCardModule,
     AuthAccessLayoutComponent,
     AuthHeroComponent,
-    LoginFormComponent
+    ResetPasswordFormComponent
   ],
   template: `
     <app-auth-access-layout>
       <app-auth-hero auth-side />
 
-      <mat-card auth-main class="login-card">
+      <mat-card auth-main class="auth-card">
         <mat-card-content>
-          <div class="reason-banner" *ngIf="reasonMessage()">{{ reasonMessage() }}</div>
-
-          <app-login-form
+          <app-reset-password-form
             [loading]="isSubmitting()"
+            [token]="token()"
+            [tokenMissing]="tokenMissing()"
             [errorMessage]="errorMessage()"
+            [successMessage]="successMessage()"
             [validationErrors]="validationErrors()"
-            (loginSubmitted)="onLogin($event)"
+            (resetSubmitted)="onResetPassword($event)"
           />
         </mat-card-content>
       </mat-card>
     </app-auth-access-layout>
   `,
   styles: [`
-    .login-card {
+    .auth-card {
       border-radius: 0;
       border: 0;
       display: grid;
@@ -49,55 +50,49 @@ import { AuthSessionService } from '../services/auth-session.service';
       background: #fffdf8;
     }
 
-    .login-card mat-card-content {
+    .auth-card mat-card-content {
       padding: 30px 34px;
     }
 
-    .reason-banner {
-      margin-bottom: 16px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: rgba(10, 122, 108, 0.07);
-      color: #075d53;
-      font-size: 0.84rem;
-      line-height: 1.5;
-      border: 1px solid rgba(10, 122, 108, 0.14);
-    }
-
     @media (max-width: 720px) {
-      .login-card mat-card-content {
+      .auth-card mat-card-content {
         padding: 22px 20px;
       }
     }
   `]
 })
-export class LoginPageComponent {
-  private readonly authSession = inject(AuthSessionService);
-  private readonly router = inject(Router);
+export class ResetPasswordPageComponent {
+  private readonly authApi = inject(AuthApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
+  protected readonly token = signal(this.route.snapshot.queryParamMap.get('token') ?? '');
+  protected readonly tokenMissing = signal(!this.token());
   protected readonly isSubmitting = signal(false);
   protected readonly errorMessage = signal('');
+  protected readonly successMessage = signal('');
   protected readonly validationErrors = signal<Record<string, string> | null>(null);
-  protected readonly reasonMessage = signal(
-    this.route.snapshot.queryParamMap.get('reason') === 'session-expired'
-      ? 'La sesion anterior expiro. Ingresa nuevamente para continuar.'
-      : ''
-  );
 
-  protected onLogin(credentials: LoginCredentials): void {
+  protected onResetPassword(payload: ResetPasswordRequest): void {
     this.isSubmitting.set(true);
     this.errorMessage.set('');
+    this.successMessage.set('');
     this.validationErrors.set(null);
 
-    this.authSession.login(credentials).subscribe({
+    this.authApi.resetPassword(payload).subscribe({
       next: () => {
-        void this.router.navigate(['/auth/session']);
+        this.successMessage.set(
+          'La contrasena fue actualizada correctamente. Ya puedes iniciar sesion.'
+        );
+
+        setTimeout(() => {
+          void this.router.navigate(['/auth/login']);
+        }, 1200);
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;
         this.errorMessage.set(
-          apiError?.message || 'No fue posible iniciar sesion. Intenta nuevamente.'
+          apiError?.message || 'No fue posible actualizar la contrasena. Intenta nuevamente.'
         );
         this.validationErrors.set(apiError?.validationErrors ?? null);
         this.isSubmitting.set(false);

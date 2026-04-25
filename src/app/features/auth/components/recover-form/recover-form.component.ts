@@ -8,10 +8,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { LoginCredentials } from '../../models/login-credentials.model';
+import { RecoverAccessRequest } from '../../models/recover-access-request.model';
 
 @Component({
-  selector: 'app-login-form',
+  selector: 'app-recover-form',
   standalone: true,
   imports: [
     CommonModule,
@@ -24,56 +24,37 @@ import { LoginCredentials } from '../../models/login-credentials.model';
     MatProgressSpinnerModule
   ],
   template: `
-    <form class="login-form" [formGroup]="form" (ngSubmit)="submit()">
+    <form class="recover-form" [formGroup]="form" (ngSubmit)="submit()">
       <div class="form-heading">
         <div class="form-badge">
-          <mat-icon>device_hub</mat-icon>
+          <mat-icon>mark_email_unread</mat-icon>
         </div>
-        <h2>Hola otra vez</h2>
-        <p>Ingresa tus credenciales para continuar.</p>
+        <h2>Recuperar acceso</h2>
+        <p>Ingresa tu correo para continuar.</p>
       </div>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Usuario</mat-label>
-        <input matInput formControlName="username" autocomplete="username" />
-        <mat-icon matSuffix>person</mat-icon>
-        <mat-error>{{ usernameError }}</mat-error>
-      </mat-form-field>
+      <div class="state-banner success" *ngIf="successMessage">{{ successMessage }}</div>
+      <div class="state-banner error" *ngIf="errorMessage">{{ errorMessage }}</div>
 
       <mat-form-field appearance="outline">
-        <mat-label>Contrasena</mat-label>
-        <input
-          matInput
-          [type]="hidePassword ? 'password' : 'text'"
-          formControlName="password"
-          autocomplete="current-password"
-        />
-        <button
-          type="button"
-          mat-icon-button
-          matSuffix
-          (click)="hidePassword = !hidePassword"
-          [attr.aria-label]="hidePassword ? 'Mostrar contrasena' : 'Ocultar contrasena'"
-        >
-          <mat-icon>{{ hidePassword ? 'visibility' : 'visibility_off' }}</mat-icon>
-        </button>
-        <mat-error>{{ passwordError }}</mat-error>
+        <mat-label>Correo electronico</mat-label>
+        <input matInput formControlName="email" autocomplete="email" />
+        <mat-icon matSuffix>alternate_email</mat-icon>
+        <mat-error>{{ emailError }}</mat-error>
       </mat-form-field>
-
-      <div class="server-error" *ngIf="errorMessage">{{ errorMessage }}</div>
 
       <button mat-flat-button color="primary" class="submit-button" [disabled]="loading">
         <span class="button-content">
           <mat-spinner *ngIf="loading" diameter="16" />
-          <span>{{ loading ? 'Validando acceso...' : 'Entrar al sistema' }}</span>
+          <span>{{ loading ? 'Enviando...' : 'Enviar instrucciones' }}</span>
         </span>
       </button>
 
-      <a class="secondary-link" routerLink="/auth/recover-access">Olvide mi contrasena</a>
+      <a class="secondary-link" routerLink="/auth/login">Volver al inicio de sesion</a>
     </form>
   `,
   styles: [`
-    .login-form {
+    .recover-form {
       display: grid;
       gap: 12px;
     }
@@ -95,12 +76,6 @@ import { LoginCredentials } from '../../models/login-credentials.model';
       border: 1px solid rgba(10, 122, 108, 0.12);
     }
 
-    .form-badge mat-icon {
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
-    }
-
     .form-heading h2 {
       margin: 0 0 6px;
       font-size: 1.5rem;
@@ -114,13 +89,23 @@ import { LoginCredentials } from '../../models/login-credentials.model';
       font-size: 0.86rem;
     }
 
-    .server-error {
+    .state-banner {
       padding: 12px 14px;
       border-radius: 14px;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      border: 1px solid transparent;
+    }
+
+    .state-banner.success {
+      background: rgba(10, 122, 108, 0.07);
+      color: #075d53;
+      border-color: rgba(10, 122, 108, 0.14);
+    }
+
+    .state-banner.error {
       background: rgba(211, 47, 47, 0.08);
       color: #b3261e;
-      font-size: 0.92rem;
-      line-height: 1.45;
     }
 
     .submit-button {
@@ -135,7 +120,7 @@ import { LoginCredentials } from '../../models/login-credentials.model';
       align-items: center;
       justify-content: center;
       gap: 8px;
-      min-width: 148px;
+      min-width: 154px;
     }
 
     .button-content mat-spinner {
@@ -155,36 +140,30 @@ import { LoginCredentials } from '../../models/login-credentials.model';
     }
   `]
 })
-export class LoginFormComponent {
+export class RecoverFormComponent {
   private readonly formBuilder = inject(FormBuilder);
 
   @Input() loading = false;
   @Input() errorMessage = '';
+  @Input() successMessage = '';
   @Input() validationErrors: Record<string, string> | null = null;
 
-  @Output() readonly loginSubmitted = new EventEmitter<LoginCredentials>();
-
-  protected hidePassword = true;
+  @Output() readonly recoverSubmitted = new EventEmitter<RecoverAccessRequest>();
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    username: ['', [Validators.required]],
-    password: ['', [Validators.required]]
+    email: ['', [Validators.required, Validators.email]]
   });
 
-  protected get usernameError(): string {
-    if (this.form.controls.username.hasError('required')) {
-      return 'El usuario es obligatorio.';
+  protected get emailError(): string {
+    if (this.form.controls.email.hasError('required')) {
+      return 'El correo es obligatorio.';
     }
 
-    return this.validationErrors?.['username'] ?? '';
-  }
-
-  protected get passwordError(): string {
-    if (this.form.controls.password.hasError('required')) {
-      return 'La contrasena es obligatoria.';
+    if (this.form.controls.email.hasError('email')) {
+      return 'Ingresa un correo valido.';
     }
 
-    return this.validationErrors?.['password'] ?? '';
+    return this.validationErrors?.['email'] ?? '';
   }
 
   protected submit(): void {
@@ -193,6 +172,6 @@ export class LoginFormComponent {
       return;
     }
 
-    this.loginSubmitted.emit(this.form.getRawValue());
+    this.recoverSubmitted.emit(this.form.getRawValue());
   }
 }

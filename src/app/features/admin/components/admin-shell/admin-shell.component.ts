@@ -23,12 +23,16 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
         </div>
 
         <nav class="module-nav">
+          <a routerLink="/admin/departments" routerLinkActive="active">
+            <mat-icon>apartment</mat-icon>
+            <span>Departamentos</span>
+          </a>
           <a routerLink="/admin/staff" routerLinkActive="active">
             <mat-icon>badge</mat-icon>
             <span>Personal</span>
           </a>
           <div class="module-nav__coming-soon">
-            <span>Usuarios, roles y departamentos se integraran en los siguientes casos.</span>
+            <span>Usuarios y roles se integraran en los siguientes casos.</span>
           </div>
         </nav>
 

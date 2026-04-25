@@ -16,7 +16,7 @@ import { AdminStaffService } from '../services/admin-staff.service';
   template: `
     <section class="page-wrap">
       <app-admin-page-header
-        eyebrow="CU03"
+        eyebrow="Personal"
         title="Gestionar personal"
         description="Administra el personal activo de la organizacion, su identificacion interna y su asignacion departamental."
         actionLabel="Nuevo personal"

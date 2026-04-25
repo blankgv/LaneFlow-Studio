@@ -7,26 +7,24 @@ import { forkJoin, of } from 'rxjs';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AdminPageHeaderComponent } from '../components/admin-page-header/admin-page-header.component';
-import { StaffFormComponent } from '../components/staff-form/staff-form.component';
+import { DepartmentFormComponent } from '../components/department-form/department-form.component';
 import { DepartmentOption } from '../models/department-option.model';
-import { Staff } from '../models/staff.model';
-import { StaffPayload } from '../models/staff-payload.model';
+import { DepartmentPayload } from '../models/department-payload.model';
 import { AdminDepartmentsService } from '../services/admin-departments.service';
-import { AdminStaffService } from '../services/admin-staff.service';
 
 @Component({
-  selector: 'app-staff-form-page',
+  selector: 'app-department-form-page',
   standalone: true,
-  imports: [CommonModule, MatCardModule, AdminPageHeaderComponent, StaffFormComponent],
+  imports: [CommonModule, MatCardModule, AdminPageHeaderComponent, DepartmentFormComponent],
   template: `
     <section class="page-wrap">
       <app-admin-page-header
-        eyebrow="Personal"
-        [title]="isEditMode() ? 'Editar personal' : 'Nuevo personal'"
+        eyebrow="Departamentos"
+        [title]="isEditMode() ? 'Editar departamento' : 'Nuevo departamento'"
         [description]="
           isEditMode()
-            ? 'Actualiza la informacion operativa y departamental del registro seleccionado.'
-            : 'Registra nuevo personal dentro de la estructura organizacional activa.'
+            ? 'Actualiza la configuracion jerarquica y descriptiva del departamento seleccionado.'
+            : 'Crea un nuevo departamento para estructurar la organizacion base del sistema.'
         "
       />
 
@@ -34,13 +32,14 @@ import { AdminStaffService } from '../services/admin-staff.service';
         <mat-card-content>
           <div class="page-alert" *ngIf="loadError()">{{ loadError() }}</div>
 
-          <app-staff-form
+          <app-department-form
             [departments]="departments()"
-            [initialValue]="currentStaff()"
+            [currentDepartmentId]="currentDepartment()?.id ?? null"
+            [initialValue]="currentDepartment()"
             [loading]="saving()"
             [errorMessage]="formError()"
             [validationErrors]="validationErrors()"
-            [submitLabel]="isEditMode() ? 'Guardar cambios' : 'Crear personal'"
+            [submitLabel]="isEditMode() ? 'Guardar cambios' : 'Crear departamento'"
             (formSubmitted)="onSubmit($event)"
           />
         </mat-card-content>
@@ -82,14 +81,13 @@ import { AdminStaffService } from '../services/admin-staff.service';
     }
   `]
 })
-export class StaffFormPageComponent {
+export class DepartmentFormPageComponent {
   private readonly departmentsService = inject(AdminDepartmentsService);
-  private readonly staffService = inject(AdminStaffService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
   protected readonly departments = signal<DepartmentOption[]>([]);
-  protected readonly currentStaff = signal<Staff | null>(null);
+  protected readonly currentDepartment = signal<DepartmentOption | null>(null);
   protected readonly loadError = signal('');
   protected readonly formError = signal('');
   protected readonly validationErrors = signal<Record<string, string> | null>(null);
@@ -100,31 +98,30 @@ export class StaffFormPageComponent {
     this.loadData();
   }
 
-  protected onSubmit(payload: StaffPayload): void {
+  protected onSubmit(payload: DepartmentPayload): void {
     const id = this.route.snapshot.paramMap.get('id');
     const request$ = id
-      ? this.staffService.updateStaff(id, payload)
-      : this.staffService.createStaff(payload);
+      ? this.departmentsService.updateDepartment(id, payload)
+      : this.departmentsService.createDepartment(payload);
 
     this.saving.set(true);
     this.formError.set('');
     this.validationErrors.set(null);
 
-    request$
-      .subscribe({
-        next: () => {
-          void this.router.navigate(['/admin/staff']);
-        },
-        error: (error: HttpErrorResponse) => {
-          const apiError = error.error as Partial<ApiError> | null;
-          this.formError.set(apiError?.message || 'No fue posible guardar el registro.');
-          this.validationErrors.set(apiError?.validationErrors ?? null);
-          this.saving.set(false);
-        },
-        complete: () => {
-          this.saving.set(false);
-        }
-      });
+    request$.subscribe({
+      next: () => {
+        void this.router.navigate(['/admin/departments']);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as Partial<ApiError> | null;
+        this.formError.set(apiError?.message || 'No fue posible guardar el departamento.');
+        this.validationErrors.set(apiError?.validationErrors ?? null);
+        this.saving.set(false);
+      },
+      complete: () => {
+        this.saving.set(false);
+      }
+    });
   }
 
   private loadData(): void {
@@ -132,25 +129,24 @@ export class StaffFormPageComponent {
     const request$ = id
       ? forkJoin({
           departments: this.departmentsService.getDepartments(),
-          staff: this.staffService.getStaffById(id)
+          department: this.departmentsService.getDepartmentById(id)
         })
       : forkJoin({
           departments: this.departmentsService.getDepartments(),
-          staff: of<Staff | null>(null)
+          department: of<DepartmentOption | null>(null)
         });
 
-    request$
-      .subscribe({
-        next: (response: { departments: DepartmentOption[]; staff: Staff | null }) => {
-          this.departments.set(response.departments);
-          this.currentStaff.set(response.staff);
-        },
-        error: (error: HttpErrorResponse) => {
-          const apiError = error.error as Partial<ApiError> | null;
-          this.loadError.set(
-            apiError?.message || 'No fue posible cargar la informacion requerida.'
-          );
-        }
-      });
+    request$.subscribe({
+      next: (response: { departments: DepartmentOption[]; department: DepartmentOption | null }) => {
+        this.departments.set(response.departments);
+        this.currentDepartment.set(response.department);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as Partial<ApiError> | null;
+        this.loadError.set(
+          apiError?.message || 'No fue posible cargar la informacion requerida.'
+        );
+      }
+    });
   }
 }

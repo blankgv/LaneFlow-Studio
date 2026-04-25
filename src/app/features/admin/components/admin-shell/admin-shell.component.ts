@@ -1,70 +1,76 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 
 import { AuthSessionService } from '../../../auth/services/auth-session.service';
 
+interface NavItem {
+  label: string;
+  icon: string;
+  link: string;
+}
+
 @Component({
   selector: 'app-admin-shell',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, MatButtonModule, MatIconModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    RouterLinkActive,
+    RouterOutlet,
+    MatButtonModule,
+    MatIconModule
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="admin-shell">
-      <aside class="admin-shell__sidebar">
-        <div class="brand-block">
-          <span class="brand-block__kicker">Admin</span>
-          <h1>Estructura organizacional y cuentas</h1>
-          <p>
-            Espacio de administracion para configurar personal, roles, usuarios y
-            departamentos de forma ordenada.
-          </p>
-        </div>
+      <aside class="sidebar">
+        <header class="sidebar__brand">
+          <span class="brand-mark">LF</span>
+          <span class="brand-name">LaneFlow</span>
+        </header>
 
-        <nav class="module-nav">
-          <button type="button" class="module-nav__item module-nav__item--ghost" disabled>
-            <mat-icon>space_dashboard</mat-icon>
-            <span>Dashboard</span>
+        <button type="button" class="nav-item nav-item--ghost" disabled>
+          <mat-icon>space_dashboard</mat-icon>
+          <span>Dashboard</span>
+        </button>
+
+        <section class="nav-section">
+          <button
+            type="button"
+            class="nav-section__trigger"
+            [class.is-open]="adminExpanded()"
+            (click)="toggleAdminExpanded()"
+          >
+            <span class="nav-section__title">
+              <mat-icon>settings_suggest</mat-icon>
+              <span>Administracion</span>
+            </span>
+            <mat-icon class="nav-section__chevron">expand_more</mat-icon>
           </button>
 
-          <section class="nav-group">
-            <button type="button" class="nav-group__trigger" (click)="toggleAdminExpanded()">
-              <span class="nav-group__label">
-                <mat-icon>settings_suggest</mat-icon>
-                <span>Administracion</span>
-              </span>
-              <mat-icon class="nav-group__chevron">
-                {{ adminExpanded() ? 'expand_less' : 'expand_more' }}
-              </mat-icon>
-            </button>
-
-            <div class="nav-group__content" *ngIf="adminExpanded()">
-              <a routerLink="/admin/departments" routerLinkActive="active">
-                <mat-icon>apartment</mat-icon>
-                <span>Departamentos</span>
-              </a>
-              <a routerLink="/admin/staff" routerLinkActive="active">
-                <mat-icon>badge</mat-icon>
-                <span>Personal</span>
-              </a>
-              <a routerLink="/admin/roles" routerLinkActive="active">
-                <mat-icon>admin_panel_settings</mat-icon>
-                <span>Roles y permisos</span>
-              </a>
-              <a routerLink="/admin/users" routerLinkActive="active">
-                <mat-icon>manage_accounts</mat-icon>
-                <span>Usuarios</span>
-              </a>
-            </div>
-          </section>
-        </nav>
-
-        <section class="session-mini">
-          <span class="session-mini__label">Sesion activa</span>
-          <strong>{{ authSession.session()?.username }}</strong>
-          <small>{{ authSession.session()?.roleCode }}</small>
+          <div class="nav-section__items" *ngIf="adminExpanded()">
+            <a
+              *ngFor="let item of adminNav"
+              class="nav-item"
+              [routerLink]="item.link"
+              routerLinkActive="is-active"
+            >
+              <mat-icon>{{ item.icon }}</mat-icon>
+              <span>{{ item.label }}</span>
+            </a>
+          </div>
         </section>
+
+        <footer class="sidebar__user">
+          <span class="user-avatar">{{ userInitials() }}</span>
+          <div class="user-meta">
+            <strong>{{ authSession.session()?.username }}</strong>
+            <small>{{ authSession.session()?.roleCode }}</small>
+          </div>
+        </footer>
       </aside>
 
       <main class="admin-shell__content">
@@ -76,155 +82,202 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
     .admin-shell {
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 280px 1fr;
-      background:
-        radial-gradient(circle at top left, rgba(10, 122, 108, 0.08), transparent 18%),
-        linear-gradient(180deg, #f7f5ef 0%, #f1ede4 100%);
+      grid-template-columns: 240px 1fr;
+      background: var(--surface-2);
     }
 
-    .admin-shell__sidebar {
-      padding: 28px 22px;
-      border-right: 1px solid rgba(29, 36, 51, 0.08);
-      background: rgba(255, 253, 248, 0.78);
-      backdrop-filter: blur(10px);
+    .sidebar {
       display: grid;
-      align-content: start;
-      gap: 28px;
+      grid-template-rows: auto auto auto 1fr auto;
+      gap: 6px;
+      padding: 18px 14px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
     }
 
-    .brand-block__kicker {
-      display: inline-block;
-      margin-bottom: 10px;
-      padding: 7px 12px;
-      border-radius: 999px;
-      background: rgba(10, 122, 108, 0.08);
-      color: #0a7a6c;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
+    /* Brand */
+    .sidebar__brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px 14px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
     }
 
-    .brand-block h1 {
-      margin: 0 0 10px;
-      font-size: 1.7rem;
-      line-height: 1.08;
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: #f0b45a;
       color: #1d2433;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .brand-block p {
-      margin: 0;
-      color: #637087;
+    .brand-name {
       font-size: 0.92rem;
-      line-height: 1.65;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
     }
 
-    .module-nav {
-      display: grid;
-      gap: 12px;
-    }
-
-    .module-nav a,
-    .module-nav__item,
-    .nav-group__trigger {
+    /* Nav */
+    .nav-item,
+    .nav-section__trigger {
       display: inline-flex;
       align-items: center;
       gap: 10px;
       width: 100%;
-      padding: 12px 14px;
-      border-radius: 14px;
-      color: #364055;
-      background: rgba(255, 255, 255, 0.78);
-      border: 1px solid rgba(29, 36, 51, 0.06);
-      font-weight: 600;
-      transition: 160ms ease-in-out;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      background: transparent;
+      border: 0;
+      font-size: 0.86rem;
+      font-weight: 500;
       text-decoration: none;
       cursor: pointer;
+      transition: background 120ms ease, color 120ms ease;
     }
 
-    .module-nav a.active,
-    .module-nav a:hover,
-    .nav-group__trigger:hover {
-      color: #fff;
-      background: linear-gradient(135deg, #0a7a6c, #075d53);
+    .nav-item mat-icon,
+    .nav-section__trigger mat-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+      color: var(--text-muted);
+      flex-shrink: 0;
     }
 
-    .module-nav__item--ghost {
-      justify-content: flex-start;
-      opacity: 0.62;
+    .nav-item:hover,
+    .nav-section__trigger:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .nav-item:hover mat-icon,
+    .nav-section__trigger:hover mat-icon {
+      color: var(--text);
+    }
+
+    .nav-item.is-active {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 600;
+    }
+
+    .nav-item.is-active mat-icon {
+      color: var(--accent);
+    }
+
+    .nav-item--ghost {
+      opacity: 0.5;
       cursor: default;
     }
 
-    .module-nav__item--ghost:disabled {
-      color: #637087;
-    }
-
-    .nav-group {
-      padding: 10px;
-      border-radius: 14px;
-      background: rgba(10, 122, 108, 0.05);
-      border: 1px dashed rgba(10, 122, 108, 0.16);
-    }
-
-    .nav-group__trigger {
-      justify-content: space-between;
+    .nav-item--ghost:hover {
       background: transparent;
-      border: 0;
-      padding: 8px 6px 12px;
+      color: var(--text-secondary);
     }
 
-    .nav-group__label {
+    .nav-item--ghost:hover mat-icon {
+      color: var(--text-muted);
+    }
+
+    /* Collapsible section */
+    .nav-section {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 6px;
+    }
+
+    .nav-section__trigger {
+      justify-content: space-between;
+    }
+
+    .nav-section__title {
       display: inline-flex;
       align-items: center;
       gap: 10px;
     }
 
-    .nav-group__chevron {
-      margin-left: 8px;
+    .nav-section__chevron {
+      transition: transform 160ms ease;
     }
 
-    .nav-group__content {
-      display: grid;
+    .nav-section__trigger.is-open .nav-section__chevron {
+      transform: rotate(180deg);
+    }
+
+    .nav-section__items {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-left: 22px;
+      margin-top: 2px;
+    }
+
+    .nav-section__items .nav-item {
+      padding: 7px 10px;
+      font-size: 0.84rem;
+    }
+
+    /* User footer */
+    .sidebar__user {
+      align-self: end;
+      display: flex;
+      align-items: center;
       gap: 10px;
+      padding: 12px 10px;
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
     }
 
-    .nav-group__content a {
-      padding-left: 12px;
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
-    .session-mini {
-      padding: 16px;
-      border-radius: 16px;
-      background: #fffdf8;
-      border: 1px solid rgba(29, 36, 51, 0.08);
-      box-shadow: 0 12px 24px rgba(29, 36, 51, 0.04);
+    .user-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
     }
 
-    .session-mini__label,
-    .session-mini strong,
-    .session-mini small {
-      display: block;
+    .user-meta strong {
+      font-size: 0.84rem;
+      color: var(--text);
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .session-mini__label {
-      margin-bottom: 8px;
-      color: #7a869d;
+    .user-meta small {
       font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
+      color: var(--text-muted);
     }
 
-    .session-mini strong {
-      margin-bottom: 6px;
-      color: #1d2433;
-    }
-
-    .session-mini small {
-      color: #637087;
-    }
-
+    /* Content */
     .admin-shell__content {
       min-width: 0;
+      background: var(--surface-2);
     }
 
     @media (max-width: 960px) {
@@ -232,9 +285,10 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
         grid-template-columns: 1fr;
       }
 
-      .admin-shell__sidebar {
+      .sidebar {
+        grid-template-rows: auto auto auto auto auto;
         border-right: 0;
-        border-bottom: 1px solid rgba(29, 36, 51, 0.08);
+        border-bottom: 1px solid var(--border);
       }
     }
   `]
@@ -243,7 +297,31 @@ export class AdminShellComponent {
   protected readonly authSession = inject(AuthSessionService);
   protected readonly adminExpanded = signal(true);
 
+  protected readonly adminNav: NavItem[] = [
+    { label: 'Departamentos', icon: 'apartment', link: '/admin/departments' },
+    { label: 'Personal', icon: 'badge', link: '/admin/staff' },
+    { label: 'Roles y permisos', icon: 'admin_panel_settings', link: '/admin/roles' },
+    { label: 'Usuarios', icon: 'manage_accounts', link: '/admin/users' }
+  ];
+
+  protected readonly userInitials = computed(() => {
+    const username = this.authSession.session()?.username ?? '';
+    const trimmed = username.trim();
+
+    if (!trimmed) {
+      return '?';
+    }
+
+    const parts = trimmed.split(/[\s._-]+/).filter(Boolean);
+
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  });
+
   protected toggleAdminExpanded(): void {
-    this.adminExpanded.set(!this.adminExpanded());
+    this.adminExpanded.update((value) => !value);
   }
 }

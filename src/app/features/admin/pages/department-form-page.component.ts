@@ -19,7 +19,6 @@ import { AdminDepartmentsService } from '../services/admin-departments.service';
   template: `
     <section class="page-wrap">
       <app-admin-page-header
-        eyebrow="Departamentos"
         [title]="isEditMode() ? 'Editar departamento' : 'Nuevo departamento'"
         [description]="
           isEditMode()

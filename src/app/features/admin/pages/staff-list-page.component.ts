@@ -1,6 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
@@ -13,25 +16,37 @@ import { AdminStaffService } from '../services/admin-staff.service';
 @Component({
   selector: 'app-staff-list-page',
   standalone: true,
-  imports: [CommonModule, AdminPageHeaderComponent, AdminSearchBarComponent, StaffTableComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
+    AdminPageHeaderComponent,
+    AdminSearchBarComponent,
+    StaffTableComponent
+  ],
   template: `
-    <section class="page-wrap">
+    <section class="admin-page">
       <app-admin-page-header
-        eyebrow="Personal"
-        title="Gestionar personal"
-        description="Administra el personal activo de la organizacion, su identificacion interna y su asignacion departamental."
-        actionLabel="Nuevo personal"
-        [actionLink]="canWrite ? ['/admin/staff/new'] : null"
+        title="Personal"
+        description="Administra el personal activo y su asignacion departamental."
       />
 
-      <div class="page-alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
+      <div class="admin-page__alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
 
-      <app-admin-search-bar
-        label="Buscar personal"
-        placeholder="Codigo, nombre, correo o departamento"
-        [value]="searchTerm()"
-        (valueChange)="searchTerm.set($event)"
-      />
+      <div class="admin-page__toolbar">
+        <app-admin-search-bar
+          label="Buscar personal"
+          placeholder="Codigo, nombre, correo o departamento"
+          [value]="searchTerm()"
+          (valueChange)="searchTerm.set($event)"
+        />
+
+        <a *ngIf="canWrite" mat-flat-button color="primary" [routerLink]="['/admin/staff/new']">
+          <mat-icon>person_add</mat-icon>
+          Nuevo personal
+        </a>
+      </div>
 
       <app-staff-table
         [staff]="filteredStaff()"
@@ -40,26 +55,7 @@ import { AdminStaffService } from '../services/admin-staff.service';
         (deactivate)="onDeactivate($event)"
       />
     </section>
-  `,
-  styles: [`
-    .page-wrap {
-      padding: 28px;
-    }
-
-    .page-alert {
-      margin-bottom: 18px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: rgba(211, 47, 47, 0.08);
-      color: #b3261e;
-    }
-
-    @media (max-width: 720px) {
-      .page-wrap {
-        padding: 20px;
-      }
-    }
-  `]
+  `
 })
 export class StaffListPageComponent {
   private readonly staffService = inject(AdminStaffService);

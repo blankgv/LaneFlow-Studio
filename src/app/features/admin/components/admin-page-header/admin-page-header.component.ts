@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,12 +8,12 @@ import { MatIconModule } from '@angular/material/icon';
   selector: 'app-admin-page-header',
   standalone: true,
   imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-header">
-      <div>
-        <span class="page-header__eyebrow">{{ eyebrow }}</span>
-        <h2>{{ title }}</h2>
-        <p>{{ description }}</p>
+      <div class="page-header__text">
+        <h1>{{ title }}</h1>
+        <p *ngIf="description">{{ description }}</p>
       </div>
 
       <a
@@ -31,39 +31,39 @@ import { MatIconModule } from '@angular/material/icon';
   styles: [`
     .page-header {
       display: flex;
-      align-items: start;
+      align-items: flex-start;
       justify-content: space-between;
-      gap: 20px;
-      margin-bottom: 24px;
+      gap: 16px;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .page-header__eyebrow {
-      display: inline-block;
-      margin-bottom: 10px;
-      color: #0a7a6c;
-      font-size: 0.74rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
+    .page-header__text {
+      min-width: 0;
     }
 
-    h2 {
-      margin: 0 0 8px;
-      font-size: clamp(1.8rem, 2.4vw, 2.4rem);
-      line-height: 1.06;
-      color: #1d2433;
+    h1 {
+      margin: 0 0 4px;
+      font-size: 1.35rem;
+      font-weight: 600;
+      line-height: 1.3;
+      color: var(--text);
+      letter-spacing: -0.01em;
     }
 
     p {
       margin: 0;
       max-width: 64ch;
-      color: #637087;
-      line-height: 1.62;
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      line-height: 1.5;
     }
 
     .page-header__action {
       flex-shrink: 0;
-      border-radius: 12px;
+      border-radius: var(--radius);
+      height: 36px;
     }
 
     @media (max-width: 720px) {
@@ -74,9 +74,8 @@ import { MatIconModule } from '@angular/material/icon';
   `]
 })
 export class AdminPageHeaderComponent {
-  @Input({ required: true }) eyebrow = '';
   @Input({ required: true }) title = '';
-  @Input({ required: true }) description = '';
+  @Input() description = '';
   @Input() actionLabel = '';
   @Input() actionLink: string[] | null = null;
   @Input() actionIcon = 'add';

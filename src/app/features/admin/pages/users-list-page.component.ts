@@ -1,6 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
@@ -13,26 +16,37 @@ import { AdminUsersService } from '../services/admin-users.service';
 @Component({
   selector: 'app-users-list-page',
   standalone: true,
-  imports: [CommonModule, AdminPageHeaderComponent, AdminSearchBarComponent, UsersTableComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
+    AdminPageHeaderComponent,
+    AdminSearchBarComponent,
+    UsersTableComponent
+  ],
   template: `
-    <section class="page-wrap">
+    <section class="admin-page">
       <app-admin-page-header
-        eyebrow="Usuarios"
-        title="Gestionar usuarios"
-        description="Administra cuentas, roles asignados, relacion con personal y mantenimiento de acceso interno."
-        actionLabel="Nuevo usuario"
-        [actionLink]="canWrite ? ['/admin/users/new'] : null"
-        actionIcon="person_add"
+        title="Usuarios"
+        description="Administra cuentas, roles asignados y vinculo con personal interno."
       />
 
-      <div class="page-alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
+      <div class="admin-page__alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
 
-      <app-admin-search-bar
-        label="Buscar usuario"
-        placeholder="Usuario, correo, personal o rol"
-        [value]="searchTerm()"
-        (valueChange)="searchTerm.set($event)"
-      />
+      <div class="admin-page__toolbar">
+        <app-admin-search-bar
+          label="Buscar usuario"
+          placeholder="Usuario, correo, personal o rol"
+          [value]="searchTerm()"
+          (valueChange)="searchTerm.set($event)"
+        />
+
+        <a *ngIf="canWrite" mat-flat-button color="primary" [routerLink]="['/admin/users/new']">
+          <mat-icon>person_add</mat-icon>
+          Nuevo usuario
+        </a>
+      </div>
 
       <app-users-table
         [users]="filteredUsers()"
@@ -41,26 +55,7 @@ import { AdminUsersService } from '../services/admin-users.service';
         (deactivate)="onDeactivate($event)"
       />
     </section>
-  `,
-  styles: [`
-    .page-wrap {
-      padding: 28px;
-    }
-
-    .page-alert {
-      margin-bottom: 18px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: rgba(211, 47, 47, 0.08);
-      color: #b3261e;
-    }
-
-    @media (max-width: 720px) {
-      .page-wrap {
-        padding: 20px;
-      }
-    }
-  `]
+  `
 })
 export class UsersListPageComponent {
   private readonly usersService = inject(AdminUsersService);

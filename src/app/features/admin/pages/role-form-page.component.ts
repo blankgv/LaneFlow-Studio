@@ -35,7 +35,6 @@ const PERMISSIONS_CATALOG: PermissionOption[] = [
   template: `
     <section class="page-wrap">
       <app-admin-page-header
-        eyebrow="Roles"
         [title]="isEditMode() ? 'Editar rol' : 'Nuevo rol'"
         [description]="
           isEditMode()

@@ -21,7 +21,6 @@ import { AdminStaffService } from '../services/admin-staff.service';
   template: `
     <section class="page-wrap">
       <app-admin-page-header
-        eyebrow="Personal"
         [title]="isEditMode() ? 'Editar personal' : 'Nuevo personal'"
         [description]="
           isEditMode()

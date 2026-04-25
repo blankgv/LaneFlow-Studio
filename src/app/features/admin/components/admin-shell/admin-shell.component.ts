@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,22 +23,41 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
         </div>
 
         <nav class="module-nav">
-          <a routerLink="/admin/departments" routerLinkActive="active">
-            <mat-icon>apartment</mat-icon>
-            <span>Departamentos</span>
-          </a>
-          <a routerLink="/admin/staff" routerLinkActive="active">
-            <mat-icon>badge</mat-icon>
-            <span>Personal</span>
-          </a>
-          <a routerLink="/admin/roles" routerLinkActive="active">
-            <mat-icon>admin_panel_settings</mat-icon>
-            <span>Roles y permisos</span>
-          </a>
-          <a routerLink="/admin/users" routerLinkActive="active">
-            <mat-icon>manage_accounts</mat-icon>
-            <span>Usuarios</span>
-          </a>
+          <button type="button" class="module-nav__item module-nav__item--ghost" disabled>
+            <mat-icon>space_dashboard</mat-icon>
+            <span>Dashboard</span>
+          </button>
+
+          <section class="nav-group">
+            <button type="button" class="nav-group__trigger" (click)="toggleAdminExpanded()">
+              <span class="nav-group__label">
+                <mat-icon>settings_suggest</mat-icon>
+                <span>Administracion</span>
+              </span>
+              <mat-icon class="nav-group__chevron">
+                {{ adminExpanded() ? 'expand_less' : 'expand_more' }}
+              </mat-icon>
+            </button>
+
+            <div class="nav-group__content" *ngIf="adminExpanded()">
+              <a routerLink="/admin/departments" routerLinkActive="active">
+                <mat-icon>apartment</mat-icon>
+                <span>Departamentos</span>
+              </a>
+              <a routerLink="/admin/staff" routerLinkActive="active">
+                <mat-icon>badge</mat-icon>
+                <span>Personal</span>
+              </a>
+              <a routerLink="/admin/roles" routerLinkActive="active">
+                <mat-icon>admin_panel_settings</mat-icon>
+                <span>Roles y permisos</span>
+              </a>
+              <a routerLink="/admin/users" routerLinkActive="active">
+                <mat-icon>manage_accounts</mat-icon>
+                <span>Usuarios</span>
+              </a>
+            </div>
+          </section>
         </nav>
 
         <section class="session-mini">
@@ -105,34 +124,72 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
       gap: 12px;
     }
 
-    .module-nav a {
+    .module-nav a,
+    .module-nav__item,
+    .nav-group__trigger {
       display: inline-flex;
       align-items: center;
       gap: 10px;
+      width: 100%;
       padding: 12px 14px;
       border-radius: 14px;
-      text-decoration: none;
       color: #364055;
       background: rgba(255, 255, 255, 0.78);
       border: 1px solid rgba(29, 36, 51, 0.06);
       font-weight: 600;
       transition: 160ms ease-in-out;
+      text-decoration: none;
+      cursor: pointer;
     }
 
     .module-nav a.active,
-    .module-nav a:hover {
+    .module-nav a:hover,
+    .nav-group__trigger:hover {
       color: #fff;
       background: linear-gradient(135deg, #0a7a6c, #075d53);
     }
 
-    .module-nav__coming-soon {
-      padding: 14px;
+    .module-nav__item--ghost {
+      justify-content: flex-start;
+      opacity: 0.62;
+      cursor: default;
+    }
+
+    .module-nav__item--ghost:disabled {
+      color: #637087;
+    }
+
+    .nav-group {
+      padding: 10px;
       border-radius: 14px;
       background: rgba(10, 122, 108, 0.05);
-      color: #637087;
-      font-size: 0.82rem;
-      line-height: 1.55;
       border: 1px dashed rgba(10, 122, 108, 0.16);
+    }
+
+    .nav-group__trigger {
+      justify-content: space-between;
+      background: transparent;
+      border: 0;
+      padding: 8px 6px 12px;
+    }
+
+    .nav-group__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-group__chevron {
+      margin-left: 8px;
+    }
+
+    .nav-group__content {
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-group__content a {
+      padding-left: 12px;
     }
 
     .session-mini {
@@ -184,4 +241,9 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
 })
 export class AdminShellComponent {
   protected readonly authSession = inject(AuthSessionService);
+  protected readonly adminExpanded = signal(true);
+
+  protected toggleAdminExpanded(): void {
+    this.adminExpanded.set(!this.adminExpanded());
+  }
 }

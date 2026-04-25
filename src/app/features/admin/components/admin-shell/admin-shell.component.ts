@@ -35,9 +35,10 @@ import { AuthSessionService } from '../../../auth/services/auth-session.service'
             <mat-icon>admin_panel_settings</mat-icon>
             <span>Roles y permisos</span>
           </a>
-          <div class="module-nav__coming-soon">
-            <span>Usuarios se integraran en el siguiente caso de uso.</span>
-          </div>
+          <a routerLink="/admin/users" routerLinkActive="active">
+            <mat-icon>manage_accounts</mat-icon>
+            <span>Usuarios</span>
+          </a>
         </nav>
 
         <section class="session-mini">

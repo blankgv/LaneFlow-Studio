@@ -1,10 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { MatButtonModule } from '@angular/material/button';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 
-import { AuthSessionService } from '../../../auth/services/auth-session.service';
+import { AuthSessionService } from '../../features/auth/services/auth-session.service';
 
 interface NavItem {
   label: string;
@@ -13,83 +13,78 @@ interface NavItem {
 }
 
 @Component({
-  selector: 'app-admin-shell',
+  selector: 'app-shell-layout',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterLink,
-    RouterLinkActive,
-    RouterOutlet,
-    MatButtonModule,
-    MatIconModule
-  ],
+  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, MatIconModule, MatButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="admin-shell">
+    <div class="app-shell">
       <aside class="sidebar">
         <header class="sidebar__brand">
           <span class="brand-mark">LF</span>
           <span class="brand-name">LaneFlow</span>
         </header>
 
-        <button type="button" class="nav-item nav-item--ghost" disabled>
-          <mat-icon>space_dashboard</mat-icon>
-          <span>Dashboard</span>
-        </button>
+        <nav class="sidebar__nav">
+          <a class="nav-item" routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+            <mat-icon>space_dashboard</mat-icon>
+            <span>Dashboard</span>
+          </a>
 
-        <section class="nav-section" *ngIf="canDesign">
-          <button
-            type="button"
-            class="nav-section__trigger"
-            [class.is-open]="designExpanded()"
-            (click)="toggleDesignExpanded()"
-          >
-            <span class="nav-section__title">
-              <mat-icon>account_tree</mat-icon>
-              <span>Diseno</span>
-            </span>
-            <mat-icon class="nav-section__chevron">expand_more</mat-icon>
-          </button>
-
-          <div class="nav-section__items" *ngIf="designExpanded()">
-            <a
-              *ngFor="let item of designNav"
-              class="nav-item"
-              [routerLink]="item.link"
-              routerLinkActive="is-active"
+          <section class="nav-section" *ngIf="canDesign">
+            <button
+              type="button"
+              class="nav-section__trigger"
+              [class.is-open]="designExpanded()"
+              (click)="toggleDesignExpanded()"
             >
-              <mat-icon>{{ item.icon }}</mat-icon>
-              <span>{{ item.label }}</span>
-            </a>
-          </div>
-        </section>
+              <span class="nav-section__title">
+                <mat-icon>account_tree</mat-icon>
+                <span>Diseno</span>
+              </span>
+              <mat-icon class="nav-section__chevron">expand_more</mat-icon>
+            </button>
 
-        <section class="nav-section">
-          <button
-            type="button"
-            class="nav-section__trigger"
-            [class.is-open]="adminExpanded()"
-            (click)="toggleAdminExpanded()"
-          >
-            <span class="nav-section__title">
-              <mat-icon>settings_suggest</mat-icon>
-              <span>Administracion</span>
-            </span>
-            <mat-icon class="nav-section__chevron">expand_more</mat-icon>
-          </button>
+            <div class="nav-section__items" *ngIf="designExpanded()">
+              <a
+                *ngFor="let item of designNav"
+                class="nav-item"
+                [routerLink]="item.link"
+                routerLinkActive="is-active"
+              >
+                <mat-icon>{{ item.icon }}</mat-icon>
+                <span>{{ item.label }}</span>
+              </a>
+            </div>
+          </section>
 
-          <div class="nav-section__items" *ngIf="adminExpanded()">
-            <a
-              *ngFor="let item of adminNav"
-              class="nav-item"
-              [routerLink]="item.link"
-              routerLinkActive="is-active"
+          <section class="nav-section" *ngIf="canAdmin">
+            <button
+              type="button"
+              class="nav-section__trigger"
+              [class.is-open]="adminExpanded()"
+              (click)="toggleAdminExpanded()"
             >
-              <mat-icon>{{ item.icon }}</mat-icon>
-              <span>{{ item.label }}</span>
-            </a>
-          </div>
-        </section>
+              <span class="nav-section__title">
+                <mat-icon>settings_suggest</mat-icon>
+                <span>Administracion</span>
+              </span>
+              <mat-icon class="nav-section__chevron">expand_more</mat-icon>
+            </button>
+
+            <div class="nav-section__items" *ngIf="adminExpanded()">
+              <a
+                *ngFor="let item of adminNav"
+                class="nav-item"
+                [routerLink]="item.link"
+                routerLinkActive="is-active"
+              >
+                <mat-icon>{{ item.icon }}</mat-icon>
+                <span>{{ item.label }}</span>
+              </a>
+            </div>
+          </section>
+        </nav>
 
         <footer class="sidebar__user">
           <span class="user-avatar">{{ userInitials() }}</span>
@@ -97,16 +92,25 @@ interface NavItem {
             <strong>{{ authSession.session()?.username }}</strong>
             <small>{{ authSession.session()?.roleCode }}</small>
           </div>
+          <button
+            type="button"
+            class="logout-btn"
+            mat-icon-button
+            aria-label="Cerrar sesion"
+            (click)="logout()"
+          >
+            <mat-icon>logout</mat-icon>
+          </button>
         </footer>
       </aside>
 
-      <main class="admin-shell__content">
+      <main class="app-shell__content">
         <router-outlet />
       </main>
     </div>
   `,
   styles: [`
-    .admin-shell {
+    .app-shell {
       min-height: 100vh;
       display: grid;
       grid-template-columns: 240px 1fr;
@@ -114,12 +118,15 @@ interface NavItem {
     }
 
     .sidebar {
-      display: grid;
-      grid-template-rows: auto auto auto auto 1fr auto;
-      gap: 6px;
+      display: flex;
+      flex-direction: column;
       padding: 18px 14px;
       background: var(--surface);
       border-right: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
     }
 
     /* Brand */
@@ -129,7 +136,8 @@ interface NavItem {
       gap: 10px;
       padding: 6px 8px 14px;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 6px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
     }
 
     .brand-mark {
@@ -144,6 +152,7 @@ interface NavItem {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
 
     .brand-name {
@@ -154,6 +163,13 @@ interface NavItem {
     }
 
     /* Nav */
+    .sidebar__nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
     .nav-item,
     .nav-section__trigger {
       display: inline-flex;
@@ -202,26 +218,12 @@ interface NavItem {
       color: var(--accent);
     }
 
-    .nav-item--ghost {
-      opacity: 0.5;
-      cursor: default;
-    }
-
-    .nav-item--ghost:hover {
-      background: transparent;
-      color: var(--text-secondary);
-    }
-
-    .nav-item--ghost:hover mat-icon {
-      color: var(--text-muted);
-    }
-
     /* Collapsible section */
     .nav-section {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .nav-section__trigger {
@@ -257,13 +259,13 @@ interface NavItem {
 
     /* User footer */
     .sidebar__user {
-      align-self: end;
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 12px 10px;
       border-top: 1px solid var(--border);
-      margin-top: 6px;
+      margin-top: auto;
+      flex-shrink: 0;
     }
 
     .user-avatar {
@@ -302,64 +304,61 @@ interface NavItem {
     }
 
     /* Content */
-    .admin-shell__content {
+    .app-shell__content {
       min-width: 0;
       background: var(--surface-2);
     }
 
     @media (max-width: 960px) {
-      .admin-shell {
+      .app-shell {
         grid-template-columns: 1fr;
       }
 
       .sidebar {
-        grid-template-rows: auto auto auto auto auto auto;
+        position: static;
+        height: auto;
         border-right: 0;
         border-bottom: 1px solid var(--border);
       }
     }
   `]
 })
-export class AdminShellComponent {
+export class AppShellComponent {
   protected readonly authSession = inject(AuthSessionService);
-  protected readonly adminExpanded = signal(true);
   protected readonly designExpanded = signal(true);
+  protected readonly adminExpanded = signal(true);
 
   protected readonly canDesign = this.authSession.hasPermission('WORKFLOW_READ');
+  protected readonly canAdmin = this.authSession.hasPermission('DEPT_READ')
+    || this.authSession.hasPermission('STAFF_READ')
+    || this.authSession.hasPermission('ROLE_READ')
+    || this.authSession.hasPermission('USER_READ');
 
   protected readonly designNav: NavItem[] = [
     { label: 'Politicas', icon: 'policy', link: '/design' }
   ];
 
   protected readonly adminNav: NavItem[] = [
-    { label: 'Departamentos', icon: 'apartment', link: '/admin/departments' },
-    { label: 'Personal', icon: 'badge', link: '/admin/staff' },
+    { label: 'Departamentos', icon: 'apartment',         link: '/admin/departments' },
+    { label: 'Personal',      icon: 'badge',             link: '/admin/staff' },
     { label: 'Roles y permisos', icon: 'admin_panel_settings', link: '/admin/roles' },
-    { label: 'Usuarios', icon: 'manage_accounts', link: '/admin/users' }
+    { label: 'Usuarios',      icon: 'manage_accounts',   link: '/admin/users' }
   ];
 
   protected readonly userInitials = computed(() => {
     const username = this.authSession.session()?.username ?? '';
     const trimmed = username.trim();
-
-    if (!trimmed) {
-      return '?';
-    }
-
+    if (!trimmed) return '?';
     const parts = trimmed.split(/[\s._-]+/).filter(Boolean);
-
-    if (parts.length === 1) {
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   });
 
   protected toggleDesignExpanded(): void {
-    this.designExpanded.update((value) => !value);
+    this.designExpanded.update((v) => !v);
   }
 
   protected toggleAdminExpanded(): void {
-    this.adminExpanded.update((value) => !value);
+    this.adminExpanded.update((v) => !v);
   }
 }

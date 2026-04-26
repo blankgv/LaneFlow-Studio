@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 
 import { ApiError } from '../../../core/models/api-error.model';
+import { resolveHomeRoute } from '../../../core/utils/resolve-home-route';
 import { AuthAccessLayoutComponent } from '../components/auth-access-layout/auth-access-layout.component';
 import { AuthHeroComponent } from '../components/auth-hero/auth-hero.component';
 import { LoginFormComponent } from '../components/login-form/login-form.component';
@@ -92,9 +93,7 @@ export class LoginPageComponent {
 
     this.authSession.login(credentials).subscribe({
       next: () => {
-        void this.router.navigate(
-          this.authSession.hasPermission('STAFF_READ') ? ['/admin/staff'] : ['/auth/session']
-        );
+        void this.router.navigate(resolveHomeRoute(this.authSession));
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;

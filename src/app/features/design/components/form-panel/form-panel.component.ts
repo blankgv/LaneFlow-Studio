@@ -555,7 +555,8 @@ export class FormPanelComponent implements OnInit {
         this.loading.set(false);
       },
       error: (error: HttpErrorResponse) => {
-        if (error.status === 404) {
+        if (error.status === 404 || error.status === 400) {
+          // 404 = no existe formulario, 400 = nodo inválido/sin formulario
           this.form.set(null);
         } else {
           const apiError = error.error as Partial<ApiError> | null;

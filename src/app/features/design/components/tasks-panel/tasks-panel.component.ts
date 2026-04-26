@@ -19,15 +19,33 @@ import { WorkflowTask } from '../../models/workflow-task.model';
       <span>Sin tareas detectadas. Agrega user tasks al diagrama.</span>
     </div>
 
+    <!-- Aviso de tareas sin lane/departamento -->
+    <div class="lane-warning" *ngIf="tasksWithoutLane().length > 0">
+      <mat-icon>warning_amber</mat-icon>
+      <span>
+        {{ tasksWithoutLane().length }} tarea(s) sin lane asignada — no se podrá publicar.
+      </span>
+    </div>
+
     <ul class="task-list" *ngIf="tasks.length > 0">
       <li
         *ngFor="let task of tasks"
         class="task-item"
+        [class.task-item--no-lane]="!task.swimlaneId"
         (click)="taskSelected.emit(task)"
       >
         <div class="task-item__info">
           <span class="task-item__name">{{ task.nodeName }}</span>
-          <span class="task-item__dept">{{ task.departmentName || task.departmentCode }}</span>
+          <span class="task-item__dept" *ngIf="task.departmentName || task.departmentCode; else noLane">
+            <mat-icon class="dept-icon">corporate_fare</mat-icon>
+            {{ task.departmentName || task.departmentCode }}
+          </span>
+          <ng-template #noLane>
+            <span class="task-item__dept task-item__dept--warn">
+              <mat-icon class="dept-icon">warning_amber</mat-icon>
+              Sin lane
+            </span>
+          </ng-template>
         </div>
         <div class="task-item__right">
           <span class="form-badge form-badge--set" *ngIf="hasForm(task); else noForm">
@@ -113,9 +131,49 @@ import { WorkflowTask } from '../../models/workflow-task.model';
       text-overflow: ellipsis;
     }
 
+    .lane-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 0 12px 10px;
+      padding: 8px 10px;
+      background: rgba(180, 83, 9, 0.08);
+      border: 1px solid rgba(180, 83, 9, 0.2);
+      border-radius: var(--radius-sm);
+      font-size: 0.76rem;
+      color: var(--warning);
+      line-height: 1.4;
+    }
+
+    .lane-warning mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .task-item--no-lane {
+      border-left: 3px solid var(--warning);
+      padding-left: 13px;
+    }
+
     .task-item__dept {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       font-size: 0.76rem;
       color: var(--text-muted);
+    }
+
+    .task-item__dept--warn {
+      color: var(--warning);
+    }
+
+    .dept-icon {
+      font-size: 12px;
+      width: 12px;
+      height: 12px;
     }
 
     .task-item__right {
@@ -164,6 +222,10 @@ export class TasksPanelComponent {
   @Input() forms: DynamicForm[] = [];
 
   @Output() readonly taskSelected = new EventEmitter<WorkflowTask>();
+
+  protected tasksWithoutLane(): WorkflowTask[] {
+    return this.tasks.filter((t) => !t.swimlaneId);
+  }
 
   protected hasForm(task: WorkflowTask): boolean {
     return task.formId !== null || this.forms.some((f) => f.nodeId === task.nodeId);

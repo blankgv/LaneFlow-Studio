@@ -13,6 +13,7 @@ import {
   inject
 } from '@angular/core';
 import BpmnModeler from 'bpmn-js/lib/Modeler';
+import BpmnNavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 
 export interface SelectedFlowElement {
   id: string;
@@ -41,64 +42,70 @@ export interface SelectedFlowElement {
 })
 export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() xml = '';
+  @Input() readonly = false;
   @Output() readonly xmlChange = new EventEmitter<string>();
   @Output() readonly flowSelected = new EventEmitter<SelectedFlowElement | null>();
 
   @ViewChild('canvas') private readonly canvasRef!: ElementRef<HTMLDivElement>;
 
   private readonly zone = inject(NgZone);
-  private modeler!: BpmnModeler;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private modeler!: any;
   private initialized = false;
   private lastImportedXml = '';
   private suppressNextEmit = false;
 
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
-      this.modeler = new BpmnModeler({
-        container: this.canvasRef.nativeElement
-      });
+      if (this.readonly) {
+        this.modeler = new BpmnNavigatedViewer({
+          container: this.canvasRef.nativeElement
+        });
+      } else {
+        this.modeler = new BpmnModeler({
+          container: this.canvasRef.nativeElement
+        });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (this.modeler as any).on('commandStack.changed', () => {
-        if (this.suppressNextEmit) {
-          this.suppressNextEmit = false;
-          return;
-        }
-        this.modeler.saveXML({ format: true }).then(({ xml }) => {
-          if (xml) {
-            this.lastImportedXml = xml;
-            this.zone.run(() => this.xmlChange.emit(xml));
+        this.modeler.on('commandStack.changed', () => {
+          if (this.suppressNextEmit) {
+            this.suppressNextEmit = false;
+            return;
+          }
+          this.modeler.saveXML({ format: true }).then(({ xml }: { xml: string }) => {
+            if (xml) {
+              this.lastImportedXml = xml;
+              this.zone.run(() => this.xmlChange.emit(xml));
+            }
+          });
+        });
+
+        this.modeler.on('selection.changed', ({ newSelection }: { newSelection: unknown[] }) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const el = newSelection?.[0] as any;
+          const isConditionalFlow =
+            el?.type === 'bpmn:SequenceFlow' &&
+            el?.source?.type === 'bpmn:ExclusiveGateway';
+
+          if (isConditionalFlow) {
+            const bo = el.businessObject;
+            this.zone.run(() => this.flowSelected.emit({
+              id: el.id,
+              condition: bo?.conditionExpression?.body ?? '',
+              name: bo?.name ?? ''
+            }));
+          } else {
+            this.zone.run(() => this.flowSelected.emit(null));
           }
         });
-      });
-
-      // Emitir cuando se selecciona un flujo de secuencia de un gateway exclusivo
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (this.modeler as any).on('selection.changed', ({ newSelection }: { newSelection: any[] }) => {
-        const el = newSelection?.[0];
-
-        const isConditionalFlow =
-          el?.type === 'bpmn:SequenceFlow' &&
-          el?.source?.type === 'bpmn:ExclusiveGateway';
-
-        if (isConditionalFlow) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const bo = (el as any).businessObject;
-          this.zone.run(() => this.flowSelected.emit({
-            id: el.id,
-            condition: bo?.conditionExpression?.body ?? '',
-            name: bo?.name ?? ''
-          }));
-        } else {
-          this.zone.run(() => this.flowSelected.emit(null));
-        }
-      });
+      }
 
       this.initialized = true;
 
       if (this.xml) {
-        this.importXml(this.xml).catch(() => this.modeler.createDiagram());
-      } else {
+        this.importXml(this.xml).catch(() => {
+          if (!this.readonly) this.modeler.createDiagram();
+        });
+      } else if (!this.readonly) {
         this.modeler.createDiagram();
       }
     });
@@ -106,14 +113,14 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   ngOnChanges(changes: SimpleChanges): void {
     const xmlChange = changes['xml'];
-    if (!xmlChange || xmlChange.firstChange || !this.initialized) {
-      return;
-    }
+    if (!xmlChange || xmlChange.firstChange || !this.initialized) return;
 
     const newXml = xmlChange.currentValue as string;
     if (newXml && newXml !== this.lastImportedXml) {
       this.zone.runOutsideAngular(() =>
-        this.importXml(newXml).catch(() => this.modeler.createDiagram())
+        this.importXml(newXml).catch(() => {
+          if (!this.readonly) this.modeler.createDiagram();
+        })
       );
     }
   }
@@ -122,18 +129,25 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.modeler?.destroy();
   }
 
-  /**
-   * Aplica o elimina la condición de un flujo de secuencia.
-   * El cambio dispara commandStack.changed → xmlChange → autosave.
-   */
-  setCondition(elementId: string, expression: string): void {
+  /** Aplica XML remoto sin disparar autosave (solo en modo edición). */
+  applyRemoteXml(xml: string): void {
+    if (!this.initialized || !xml) return;
     this.zone.runOutsideAngular(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const modeling = (this.modeler as any).get('modeling');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const elementRegistry = (this.modeler as any).get('elementRegistry');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const moddle = (this.modeler as any).get('moddle');
+      this.suppressNextEmit = true;
+      this.lastImportedXml = xml;
+      this.modeler.importXML(xml)
+        .then(() => { this.suppressNextEmit = false; })
+        .catch(() => { this.suppressNextEmit = false; });
+    });
+  }
+
+  /** Aplica o elimina la condición de un flujo (solo en modo edición). */
+  setCondition(elementId: string, expression: string): void {
+    if (this.readonly) return;
+    this.zone.runOutsideAngular(() => {
+      const modeling = this.modeler.get('modeling');
+      const elementRegistry = this.modeler.get('elementRegistry');
+      const moddle = this.modeler.get('moddle');
 
       const element = elementRegistry.get(elementId);
       if (!element) return;
@@ -146,20 +160,6 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
         });
         modeling.updateProperties(element, { conditionExpression });
       }
-    });
-  }
-
-  /**
-   * Importa XML recibido de otro usuario sin disparar autosave.
-   */
-  applyRemoteXml(xml: string): void {
-    if (!this.initialized || !xml) return;
-    this.zone.runOutsideAngular(() => {
-      this.suppressNextEmit = true;
-      this.lastImportedXml = xml;
-      this.modeler.importXML(xml)
-        .then(() => { this.suppressNextEmit = false; })
-        .catch(() => { this.suppressNextEmit = false; });
     });
   }
 

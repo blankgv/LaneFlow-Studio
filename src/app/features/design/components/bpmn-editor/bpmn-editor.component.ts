@@ -21,6 +21,11 @@ export interface SelectedFlowElement {
   name: string;
 }
 
+export interface LaneAddedEvent {
+  elementId: string;
+  elementType: 'lane' | 'pool';
+}
+
 @Component({
   selector: 'app-bpmn-editor',
   standalone: true,
@@ -45,6 +50,7 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() readonly = false;
   @Output() readonly xmlChange = new EventEmitter<string>();
   @Output() readonly flowSelected = new EventEmitter<SelectedFlowElement | null>();
+  @Output() readonly laneAdded = new EventEmitter<LaneAddedEvent>();
 
   @ViewChild('canvas') private readonly canvasRef!: ElementRef<HTMLDivElement>;
 
@@ -77,6 +83,17 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
               this.zone.run(() => this.xmlChange.emit(xml));
             }
           });
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.modeler.on('commandStack.shape.create.postExecuted', ({ context }: any) => {
+          const shape = context?.shape;
+          if (!shape) return;
+          if (shape.type === 'bpmn:Lane') {
+            this.zone.run(() => this.laneAdded.emit({ elementId: shape.id, elementType: 'lane' }));
+          } else if (shape.type === 'bpmn:Participant') {
+            this.zone.run(() => this.laneAdded.emit({ elementId: shape.id, elementType: 'pool' }));
+          }
         });
 
         this.modeler.on('selection.changed', ({ newSelection }: { newSelection: unknown[] }) => {
@@ -138,6 +155,18 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.modeler.importXML(xml)
         .then(() => { this.suppressNextEmit = false; })
         .catch(() => { this.suppressNextEmit = false; });
+    });
+  }
+
+  /** Actualiza el nombre (label) de un elemento (lane, pool, task, etc.) */
+  setElementName(elementId: string, name: string): void {
+    if (this.readonly) return;
+    this.zone.runOutsideAngular(() => {
+      const modeling = this.modeler.get('modeling');
+      const elementRegistry = this.modeler.get('elementRegistry');
+      const element = elementRegistry.get(elementId);
+      if (!element) return;
+      modeling.updateProperties(element, { name });
     });
   }
 

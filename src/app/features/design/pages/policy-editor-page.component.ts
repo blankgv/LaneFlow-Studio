@@ -6,12 +6,15 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 import { ApiError } from '../../../core/models/api-error.model';
+import { DepartmentOption } from '../../admin/models/department-option.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
-import { BpmnEditorComponent, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
+import { AssignDepartmentDialogComponent } from '../components/assign-department-dialog/assign-department-dialog.component';
+import { BpmnEditorComponent, LaneAddedEvent, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
 import { FormPanelComponent } from '../components/form-panel/form-panel.component';
 import { PresenceIndicatorComponent } from '../components/presence-indicator/presence-indicator.component';
 import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
@@ -34,6 +37,7 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
     CommonModule,
     RouterLink,
     MatButtonModule,
+    MatDialogModule,
     MatIconModule,
     BpmnEditorComponent,
     TasksPanelComponent,
@@ -64,27 +68,44 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
         <app-presence-indicator [session]="collaboration" />
 
         <div class="editor-toolbar__right" *ngIf="snapshot()?.canEdit">
-          <!-- Indicador autosave -->
-          <span class="save-indicator" [ngClass]="'save-indicator--' + saveState()">
-            <mat-icon>{{ saveStateIcon() }}</mat-icon>
-            {{ saveStateLabel() }}
-          </span>
 
-          <button mat-stroked-button [disabled]="saveState() === 'saving'" (click)="save()">
-            <mat-icon>save</mat-icon>
-            Guardar
-          </button>
+          <!-- Política publicada: solo botón nuevo borrador -->
+          <ng-container *ngIf="snapshot()?.workflow?.status === 'PUBLISHED'; else draftActions">
+            <button
+              mat-flat-button
+              color="primary"
+              [disabled]="creatingDraft()"
+              (click)="createDraft()"
+            >
+              <mat-icon>edit_note</mat-icon>
+              {{ creatingDraft() ? 'Creando...' : 'Nuevo borrador' }}
+            </button>
+          </ng-container>
 
-          <button
-            *ngIf="canPublish()"
-            mat-flat-button
-            color="primary"
-            [disabled]="publishing()"
-            (click)="publish()"
-          >
-            <mat-icon>publish</mat-icon>
-            {{ publishing() ? 'Publicando...' : 'Publicar' }}
-          </button>
+          <!-- Política en borrador: guardar + publicar -->
+          <ng-template #draftActions>
+            <span class="save-indicator" [ngClass]="'save-indicator--' + saveState()">
+              <mat-icon>{{ saveStateIcon() }}</mat-icon>
+              {{ saveStateLabel() }}
+            </span>
+
+            <button mat-stroked-button [disabled]="saveState() === 'saving'" (click)="save()">
+              <mat-icon>save</mat-icon>
+              Guardar
+            </button>
+
+            <button
+              *ngIf="canPublish()"
+              mat-flat-button
+              color="primary"
+              [disabled]="publishing()"
+              (click)="publish()"
+            >
+              <mat-icon>publish</mat-icon>
+              {{ publishing() ? 'Publicando...' : 'Publicar' }}
+            </button>
+          </ng-template>
+
         </div>
       </header>
 
@@ -107,6 +128,7 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
             [readonly]="!snapshot()?.canEdit"
             (xmlChange)="onXmlChange($event)"
             (flowSelected)="onFlowSelected($event)"
+            (laneAdded)="onLaneAdded($event)"
           />
         </div>
 
@@ -721,6 +743,7 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   private readonly collaborationService = inject(WorkflowCollaborationService);
   private readonly authSession = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly dialog = inject(MatDialog);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
@@ -735,6 +758,7 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   protected readonly loadingHistory = signal(false);
   protected readonly selectedFlow = signal<SelectedFlowElement | null>(null);
   protected readonly conditionDraft = signal('');
+  protected readonly creatingDraft = signal(false);
 
   protected collaboration: CollaborationSession | null = null;
   protected readonly conditionPlaceholder = 'ej: ${aprobado == true}';
@@ -891,6 +915,49 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   protected onFlowSelected(flow: SelectedFlowElement | null): void {
     this.selectedFlow.set(flow);
     this.conditionDraft.set(flow?.condition ?? '');
+  }
+
+  protected onLaneAdded(event: LaneAddedEvent): void {
+    const ref = this.dialog.open(AssignDepartmentDialogComponent, {
+      data: event,
+      disableClose: true,
+      panelClass: 'assign-dept-dialog-panel'
+    });
+
+    ref.afterClosed().subscribe((dept: DepartmentOption | null) => {
+      if (dept && this.bpmnEditor) {
+        this.bpmnEditor.setElementName(event.elementId, dept.code);
+      }
+    });
+  }
+
+  protected createDraft(): void {
+    const snap = this.snapshot();
+    if (!snap || this.creatingDraft()) return;
+
+    this.creatingDraft.set(true);
+    this.publishError.set('');
+
+    const payload: WorkflowUpdatePayload = {
+      name: snap.workflow.name,
+      description: snap.workflow.description,
+      bpmnXml: this.currentXml()
+    };
+
+    this.workflowApi.updateWorkflow(snap.workflow.id, payload).subscribe({
+      next: () => {
+        this.creatingDraft.set(false);
+        this.saveState.set('saved');
+        this.refreshSnapshot();
+      },
+      error: (err: HttpErrorResponse) => {
+        const apiError = err.error as Partial<ApiError> | null;
+        this.publishError.set(
+          apiError?.message || 'No fue posible crear el nuevo borrador.'
+        );
+        this.creatingDraft.set(false);
+      }
+    });
   }
 
   protected applyCondition(): void {

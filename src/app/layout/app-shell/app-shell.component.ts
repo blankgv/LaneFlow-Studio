@@ -303,6 +303,24 @@ interface NavItem {
       color: var(--text-muted);
     }
 
+    .logout-btn {
+      margin-left: auto;
+      flex-shrink: 0;
+      color: var(--text-muted);
+      width: 30px;
+      height: 30px;
+    }
+
+    .logout-btn:hover {
+      color: var(--danger);
+    }
+
+    .logout-btn mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
     /* Content */
     .app-shell__content {
       min-width: 0;
@@ -325,6 +343,7 @@ interface NavItem {
 })
 export class AppShellComponent {
   protected readonly authSession = inject(AuthSessionService);
+  private readonly router = inject(Router);
   protected readonly designExpanded = signal(true);
   protected readonly adminExpanded = signal(true);
 
@@ -353,6 +372,12 @@ export class AppShellComponent {
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   });
+
+  protected logout(): void {
+    this.authSession.logout().subscribe(() => {
+      void this.router.navigate(['/auth/login']);
+    });
+  }
 
   protected toggleDesignExpanded(): void {
     this.designExpanded.update((v) => !v);

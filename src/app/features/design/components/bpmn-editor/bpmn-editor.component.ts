@@ -23,11 +23,13 @@ import BpmnModeler from 'bpmn-js/lib/Modeler';
       display: block;
       width: 100%;
       height: 100%;
+      background: #fff;
     }
 
     .bpmn-canvas {
       width: 100%;
       height: 100%;
+      background: #fff;
     }
   `]
 })
@@ -61,7 +63,7 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.initialized = true;
 
       if (this.xml) {
-        this.importXml(this.xml);
+        this.importXml(this.xml).catch(() => this.modeler.createDiagram());
       } else {
         this.modeler.createDiagram();
       }
@@ -76,7 +78,9 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     const newXml = xmlChange.currentValue as string;
     if (newXml && newXml !== this.lastImportedXml) {
-      this.zone.runOutsideAngular(() => this.importXml(newXml));
+      this.zone.runOutsideAngular(() =>
+        this.importXml(newXml).catch(() => this.modeler.createDiagram())
+      );
     }
   }
 
@@ -84,10 +88,8 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.modeler?.destroy();
   }
 
-  private importXml(xml: string): void {
+  private importXml(xml: string): Promise<void> {
     this.lastImportedXml = xml;
-    this.modeler.importXML(xml).catch(() => {
-      // import errors surface via backend validation on save
-    });
+    return this.modeler.importXML(xml).then(() => {});
   }
 }

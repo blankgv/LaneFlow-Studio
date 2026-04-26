@@ -14,6 +14,12 @@ import {
 } from '@angular/core';
 import BpmnModeler from 'bpmn-js/lib/Modeler';
 
+export interface SelectedFlowElement {
+  id: string;
+  condition: string;
+  name: string;
+}
+
 @Component({
   selector: 'app-bpmn-editor',
   standalone: true,
@@ -36,6 +42,7 @@ import BpmnModeler from 'bpmn-js/lib/Modeler';
 export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() xml = '';
   @Output() readonly xmlChange = new EventEmitter<string>();
+  @Output() readonly flowSelected = new EventEmitter<SelectedFlowElement | null>();
 
   @ViewChild('canvas') private readonly canvasRef!: ElementRef<HTMLDivElement>;
 
@@ -65,6 +72,28 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
         });
       });
 
+      // Emitir cuando se selecciona un flujo de secuencia de un gateway exclusivo
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.modeler as any).on('selection.changed', ({ newSelection }: { newSelection: any[] }) => {
+        const el = newSelection?.[0];
+
+        const isConditionalFlow =
+          el?.type === 'bpmn:SequenceFlow' &&
+          el?.source?.type === 'bpmn:ExclusiveGateway';
+
+        if (isConditionalFlow) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const bo = (el as any).businessObject;
+          this.zone.run(() => this.flowSelected.emit({
+            id: el.id,
+            condition: bo?.conditionExpression?.body ?? '',
+            name: bo?.name ?? ''
+          }));
+        } else {
+          this.zone.run(() => this.flowSelected.emit(null));
+        }
+      });
+
       this.initialized = true;
 
       if (this.xml) {
@@ -91,6 +120,33 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   ngOnDestroy(): void {
     this.modeler?.destroy();
+  }
+
+  /**
+   * Aplica o elimina la condición de un flujo de secuencia.
+   * El cambio dispara commandStack.changed → xmlChange → autosave.
+   */
+  setCondition(elementId: string, expression: string): void {
+    this.zone.runOutsideAngular(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const modeling = (this.modeler as any).get('modeling');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const elementRegistry = (this.modeler as any).get('elementRegistry');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const moddle = (this.modeler as any).get('moddle');
+
+      const element = elementRegistry.get(elementId);
+      if (!element) return;
+
+      if (!expression.trim()) {
+        modeling.updateProperties(element, { conditionExpression: undefined });
+      } else {
+        const conditionExpression = moddle.create('bpmn:FormalExpression', {
+          body: expression.trim()
+        });
+        modeling.updateProperties(element, { conditionExpression });
+      }
+    });
   }
 
   /**

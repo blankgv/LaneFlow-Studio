@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 
@@ -10,6 +11,7 @@ import { ApiError } from '../../../core/models/api-error.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AdminPageHeaderComponent } from '../../admin/components/admin-page-header/admin-page-header.component';
 import { AdminSearchBarComponent } from '../../admin/components/admin-search-bar/admin-search-bar.component';
+import { CollaboratorsDialogComponent } from '../components/collaborators-dialog/collaborators-dialog.component';
 import { WorkflowSummary } from '../models/workflow-summary.model';
 import { WorkflowStatus } from '../models/workflow.model';
 import { WorkflowApiService } from '../services/workflow-api.service';
@@ -22,6 +24,7 @@ import { WorkflowApiService } from '../services/workflow-api.service';
     CommonModule,
     RouterLink,
     MatButtonModule,
+    MatDialogModule,
     MatIconModule,
     MatTableModule,
     AdminPageHeaderComponent,
@@ -100,6 +103,9 @@ import { WorkflowApiService } from '../services/workflow-api.service';
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef class="data-table__actions"></th>
               <td mat-cell *matCellDef="let item" class="data-table__actions">
+                <button mat-icon-button (click)="openCollaborators(item)" aria-label="Gestionar equipo">
+                  <mat-icon>group</mat-icon>
+                </button>
                 <a mat-icon-button [routerLink]="['/design', item.id, 'editor']" aria-label="Abrir editor">
                   <mat-icon>edit</mat-icon>
                 </a>
@@ -191,6 +197,7 @@ import { WorkflowApiService } from '../services/workflow-api.service';
 export class PolicyListPageComponent {
   private readonly workflowApi = inject(WorkflowApiService);
   private readonly authSession = inject(AuthSessionService);
+  private readonly dialog = inject(MatDialog);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal('');
@@ -215,6 +222,13 @@ export class PolicyListPageComponent {
 
   constructor() {
     this.loadPolicies();
+  }
+
+  protected openCollaborators(item: WorkflowSummary): void {
+    this.dialog.open(CollaboratorsDialogComponent, {
+      data: { workflowId: item.id, workflowName: item.name, workflowCode: item.code },
+      panelClass: 'collab-dialog-panel'
+    });
   }
 
   protected statusLabel(status: WorkflowStatus): string {

@@ -9,7 +9,6 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { BpmnEditorComponent } from '../components/bpmn-editor/bpmn-editor.component';
-import { CollaboratorsPanelComponent } from '../components/collaborators-panel/collaborators-panel.component';
 import { FormPanelComponent } from '../components/form-panel/form-panel.component';
 import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
 import { WorkflowEditorSnapshot } from '../models/workflow-editor-snapshot.model';
@@ -17,8 +16,6 @@ import { WorkflowStatus } from '../models/workflow.model';
 import { WorkflowTask } from '../models/workflow-task.model';
 import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
 import { WorkflowApiService } from '../services/workflow-api.service';
-
-type PanelTab = 'tasks' | 'collaborators';
 
 @Component({
   selector: 'app-policy-editor-page',
@@ -31,8 +28,7 @@ type PanelTab = 'tasks' | 'collaborators';
     MatIconModule,
     BpmnEditorComponent,
     TasksPanelComponent,
-    FormPanelComponent,
-    CollaboratorsPanelComponent
+    FormPanelComponent
   ],
   template: `
     <div class="editor-layout" *ngIf="!loading() && !errorMessage(); else stateTpl">
@@ -72,57 +68,27 @@ type PanelTab = 'tasks' | 'collaborators';
         <!-- Panel lateral -->
         <aside class="editor-panel">
 
-          <!-- Tabs -->
-          <div class="panel-tabs">
-            <button
-              class="panel-tab"
-              [class.is-active]="activeTab() === 'tasks'"
-              (click)="activeTab.set('tasks'); selectedTask.set(null)"
-            >
-              <mat-icon>pending_actions</mat-icon>
-              Tareas
-            </button>
-            <button
-              class="panel-tab"
-              [class.is-active]="activeTab() === 'collaborators'"
-              (click)="activeTab.set('collaborators')"
-            >
-              <mat-icon>group</mat-icon>
-              Equipo
-            </button>
+          <div class="panel-header">
+            <span class="panel-header__title">Tareas</span>
           </div>
 
-          <!-- Contenido del panel -->
           <div class="panel-body">
-
-            <!-- Tab Tareas -->
-            <ng-container *ngIf="activeTab() === 'tasks'">
-              <app-form-panel
-                *ngIf="selectedTask(); else tasksList"
-                [task]="selectedTask()!"
-                [workflowId]="snapshot()!.workflow.id"
-                (back)="selectedTask.set(null)"
-                (formUpdated)="onFormUpdated()"
-              />
-              <ng-template #tasksList>
-                <app-tasks-panel
-                  [tasks]="snapshot()?.tasks ?? []"
-                  [forms]="snapshot()?.forms ?? []"
-                  (taskSelected)="selectedTask.set($event)"
-                />
-              </ng-template>
-            </ng-container>
-
-            <!-- Tab Colaboradores -->
-            <app-collaborators-panel
-              *ngIf="activeTab() === 'collaborators'"
+            <app-form-panel
+              *ngIf="selectedTask(); else tasksList"
+              [task]="selectedTask()!"
               [workflowId]="snapshot()!.workflow.id"
-              [collaborators]="snapshot()?.collaborators ?? []"
-              [invitations]="snapshot()?.invitations ?? []"
-              (collaboratorAdded)="reloadSnapshot()"
+              (back)="selectedTask.set(null)"
+              (formUpdated)="onFormUpdated()"
             />
-
+            <ng-template #tasksList>
+              <app-tasks-panel
+                [tasks]="snapshot()?.tasks ?? []"
+                [forms]="snapshot()?.forms ?? []"
+                (taskSelected)="selectedTask.set($event)"
+              />
+            </ng-template>
           </div>
+
         </aside>
       </div>
     </div>
@@ -226,43 +192,20 @@ type PanelTab = 'tasks' | 'collaborators';
       overflow: hidden;
     }
 
-    .panel-tabs {
+    .panel-header {
       display: flex;
+      align-items: center;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
 
-    .panel-tab {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      flex: 1;
-      padding: 10px 8px;
-      border: 0;
-      border-bottom: 2px solid transparent;
-      background: transparent;
+    .panel-header__title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--text-muted);
-      font-size: 0.82rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: color 120ms ease, border-color 120ms ease;
-    }
-
-    .panel-tab mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
-
-    .panel-tab:hover {
-      color: var(--text);
-    }
-
-    .panel-tab.is-active {
-      color: var(--accent-strong);
-      border-bottom-color: var(--accent);
-      font-weight: 600;
     }
 
     .panel-body {
@@ -333,7 +276,6 @@ export class PolicyEditorPageComponent {
   protected readonly saving = signal(false);
   protected readonly snapshot = signal<WorkflowEditorSnapshot | null>(null);
   protected readonly currentXml = signal('');
-  protected readonly activeTab = signal<PanelTab>('tasks');
   protected readonly selectedTask = signal<WorkflowTask | null>(null);
 
   private readonly workflowId: string;

@@ -14,7 +14,7 @@ import { ApiError } from '../../../core/models/api-error.model';
 import { DepartmentOption } from '../../admin/models/department-option.model';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AssignDepartmentDialogComponent } from '../components/assign-department-dialog/assign-department-dialog.component';
-import { BpmnEditorComponent, LaneAddedEvent, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
+import { BpmnEditorComponent, BpmnValidationSummary, LaneAddedEvent, LaneInsertRequest, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
 import { FormPanelComponent } from '../components/form-panel/form-panel.component';
 import { PresenceIndicatorComponent } from '../components/presence-indicator/presence-indicator.component';
 import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
@@ -118,6 +118,15 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
         </button>
       </div>
 
+      <!-- Advertencia estructural (no bloqueante) -->
+      <div class="bpmn-warning" *ngIf="bpmnWarning()">
+        <mat-icon>warning_amber</mat-icon>
+        {{ bpmnWarning() }}
+        <button type="button" class="publish-error__close" (click)="bpmnWarning.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
       <!-- Body -->
       <div class="editor-body">
 
@@ -129,6 +138,10 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
             (xmlChange)="onXmlChange($event)"
             (flowSelected)="onFlowSelected($event)"
             (laneAdded)="onLaneAdded($event)"
+            (laneInsertRequested)="onLaneInsertRequested($event)"
+            (poolCreated)="onPoolCreated($event)"
+            (multiplePoolsBlocked)="onMultiplePoolsBlocked()"
+            (taskOutsideLane)="onTaskOutsideLane()"
           />
         </div>
 
@@ -684,6 +697,26 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
       flex-shrink: 0;
     }
 
+    /* Advertencia estructural */
+    .bpmn-warning {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(180, 83, 9, 0.08);
+      color: var(--warning);
+      font-size: 0.82rem;
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(180, 83, 9, 0.2);
+    }
+
+    .bpmn-warning mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
     /* Status badge */
     .status-badge {
       display: inline-flex;
@@ -759,6 +792,7 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   protected readonly selectedFlow = signal<SelectedFlowElement | null>(null);
   protected readonly conditionDraft = signal('');
   protected readonly creatingDraft = signal(false);
+  protected readonly bpmnWarning = signal('');
 
   protected collaboration: CollaborationSession | null = null;
   protected readonly conditionPlaceholder = 'ej: ${aprobado == true}';
@@ -854,13 +888,10 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
     const snap = this.snapshot();
     if (!snap || this.publishing()) return;
 
-    // Pre-validación en cliente
-    const tasksWithoutLane = snap.tasks.filter((t) => !t.swimlaneId);
-    if (tasksWithoutLane.length > 0) {
-      const names = tasksWithoutLane.map((t) => t.nodeName || t.nodeId).join(', ');
-      this.publishError.set(
-        `Las siguientes tareas no tienen lane/departamento asignado: ${names}. Asígnalas a una lane antes de publicar.`
-      );
+    // ── Pre-validación estructural del BPMN ────────────────────────────────
+    const error = this.validateBpmnStructure(snap);
+    if (error) {
+      this.publishError.set(error);
       return;
     }
 
@@ -874,19 +905,52 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
             this.snapshot.update((s) => s ? { ...s, workflow: updated } : s);
             this.publishing.set(false);
           },
-          error: (error: HttpErrorResponse) => {
-            const apiError = error.error as Partial<ApiError> | null;
+          error: (err: HttpErrorResponse) => {
+            const apiError = err.error as Partial<ApiError> | null;
             this.publishError.set(apiError?.message || 'No fue posible publicar la politica.');
             this.publishing.set(false);
           }
         });
       },
-      error: (error: HttpErrorResponse) => {
-        const apiError = error.error as Partial<ApiError> | null;
+      error: (err: HttpErrorResponse) => {
+        const apiError = err.error as Partial<ApiError> | null;
         this.publishError.set(apiError?.message || 'La politica no paso la validacion.');
         this.publishing.set(false);
       }
     });
+  }
+
+  /** Valida la estructura BPMN antes de publicar. Retorna mensaje de error o null si es válido. */
+  private validateBpmnStructure(snap: NonNullable<ReturnType<typeof this.snapshot>>): string | null {
+    // Validación desde snapshot (backend): tasks sin lane
+    const tasksWithoutLane = snap.tasks.filter((t) => !t.swimlaneId);
+    if (tasksWithoutLane.length > 0) {
+      const names = tasksWithoutLane.map((t) => t.nodeName || t.nodeId).join(', ');
+      return `Las siguientes tareas no tienen lane asignada: ${names}.`;
+    }
+
+    // Validación estructural del canvas (si el editor está activo)
+    if (!this.bpmnEditor) return null;
+    const summary: BpmnValidationSummary = this.bpmnEditor.getValidationSummary();
+
+    if (summary.pools > 1) {
+      return 'El diagrama tiene más de un pool. Solo se permite un pool por política.';
+    }
+
+    if (summary.lanes.length === 0) {
+      return 'El diagrama no tiene ninguna lane. Agrega al menos una lane con departamento asignado.';
+    }
+
+    const lanesWithoutDept = summary.lanes.filter((l) => !l.name.trim());
+    if (lanesWithoutDept.length > 0) {
+      return `Hay ${lanesWithoutDept.length} lane(s) sin departamento asignado. Asigna un departamento a cada lane antes de publicar.`;
+    }
+
+    if (summary.tasksOutsideLane > 0) {
+      return `Hay ${summary.tasksOutsideLane} tarea(s) fuera de una lane. Todas las tareas deben estar dentro de una lane.`;
+    }
+
+    return null;
   }
 
   protected canPublish(): boolean {
@@ -917,6 +981,52 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
     this.conditionDraft.set(flow?.condition ?? '');
   }
 
+  protected onPoolCreated(poolId: string): void {
+    const ref = this.dialog.open(AssignDepartmentDialogComponent, {
+      data: { elementId: poolId, elementType: 'pool' } as LaneAddedEvent,
+      disableClose: true,
+      panelClass: 'assign-dept-dialog-panel'
+    });
+
+    ref.afterClosed().subscribe((dept: DepartmentOption | null) => {
+      if (!this.bpmnEditor) return;
+      if (!dept) {
+        this.bpmnEditor.removeElement(poolId);
+        return;
+      }
+      // El pool siempre lleva el nombre de la política, no del departamento
+      const policyName = this.snapshot()?.workflow.name ?? '';
+      this.bpmnEditor.setElementName(poolId, policyName);
+      // Si el usuario eligió dept, crear el primer lane con ese código
+      this.bpmnEditor.addLaneToPool(poolId, dept.code);
+    });
+  }
+
+  protected onMultiplePoolsBlocked(): void {
+    this.bpmnWarning.set(
+      'Solo se permite un pool por política. El pool adicional fue eliminado automáticamente.'
+    );
+  }
+
+  protected onTaskOutsideLane(): void {
+    this.bpmnWarning.set(
+      'Una tarea fue colocada fuera de una lane. Muévela dentro de una lane de departamento antes de publicar.'
+    );
+  }
+
+  protected onLaneInsertRequested(request: LaneInsertRequest): void {
+    const ref = this.dialog.open(AssignDepartmentDialogComponent, {
+      data: { elementId: request.targetElementId, elementType: 'lane' } as LaneAddedEvent,
+      disableClose: true,
+      panelClass: 'assign-dept-dialog-panel'
+    });
+
+    ref.afterClosed().subscribe((dept: DepartmentOption | null) => {
+      if (!this.bpmnEditor || !dept) return;
+      this.bpmnEditor.addLaneNear(request.targetElementId, request.location, dept.code);
+    });
+  }
+
   protected onLaneAdded(event: LaneAddedEvent): void {
     const ref = this.dialog.open(AssignDepartmentDialogComponent, {
       data: event,
@@ -925,9 +1035,12 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe((dept: DepartmentOption | null) => {
-      if (dept && this.bpmnEditor) {
+      if (!this.bpmnEditor) return;
+      if (dept) {
         this.bpmnEditor.setElementName(event.elementId, dept.code);
       }
+      // Si omitió: la lane queda sin nombre (el editor ya limpió la lane resto de bpmn-js).
+      // La validación pre-publicación bloquea lanes sin departamento.
     });
   }
 
@@ -1023,6 +1136,11 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
           this.currentXml.set(snapshot.workflow.draftBpmnXml);
           this.saveState.set('saved');
         }
+        // Sincronizar nombre del pool con el nombre de la política
+        // (setTimeout porque el editor puede no estar listo aún en el primer ciclo)
+        setTimeout(() => {
+          this.bpmnEditor?.syncPoolName(snapshot.workflow.name);
+        }, 300);
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;

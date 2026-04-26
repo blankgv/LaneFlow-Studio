@@ -11,7 +11,15 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { WorkflowApiService } from '../../services/workflow-api.service';
 
-const BLANK_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
+/** Genera el BPMN inicial: 1 pool (nombre = política) + 1 lane vacío. */
+function buildInitialBpmn(policyName: string): string {
+  const safe = policyName
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -19,11 +27,19 @@ const BLANK_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
   id="Definitions_1"
   targetNamespace="http://bpmn.io/schema/bpmn">
-  <bpmn:process id="Process_1" isExecutable="false" />
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_1" name="${safe}" processRef="Process_1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" isExecutable="true" />
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1" />
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_1_di" bpmnElement="Participant_1" isHorizontal="true">
+        <dc:Bounds x="130" y="52" width="750" height="250" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
+}
 
 @Component({
   selector: 'app-create-policy-dialog',
@@ -284,7 +300,7 @@ export class CreatePolicyDialogComponent {
       code,
       name,
       description: this.description.trim() || null,
-      bpmnXml: BLANK_BPMN
+      bpmnXml: buildInitialBpmn(name)
     }).subscribe({
       next: (workflow) => {
         this.dialogRef.close(true);

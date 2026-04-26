@@ -782,8 +782,18 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
     this.workflowApi.updateWorkflow(snap.workflow.id, payload).subscribe({
       next: () => {
         this.saveState.set('saved');
+        this.refreshSnapshot();
       },
-      error: () => this.saveState.set('error')
+      error: (err: HttpErrorResponse) => {
+        // 409 = conflicto de concurrencia con WebSocket draft.save
+        // Los datos ya se guardaron via WebSocket, no es un error real
+        if (err.status === 409) {
+          this.saveState.set('saved');
+          this.refreshSnapshot();
+        } else {
+          this.saveState.set('error');
+        }
+      }
     });
   }
 

@@ -1,10 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  signal
+  ChangeDetectionStrategy, Component, inject, signal
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,10 +9,16 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { ApiError } from '../../../core/models/api-error.model';
 import { BpmnEditorComponent } from '../components/bpmn-editor/bpmn-editor.component';
+import { CollaboratorsPanelComponent } from '../components/collaborators-panel/collaborators-panel.component';
+import { FormPanelComponent } from '../components/form-panel/form-panel.component';
+import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
 import { WorkflowEditorSnapshot } from '../models/workflow-editor-snapshot.model';
 import { WorkflowStatus } from '../models/workflow.model';
-import { WorkflowApiService } from '../services/workflow-api.service';
+import { WorkflowTask } from '../models/workflow-task.model';
 import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
+import { WorkflowApiService } from '../services/workflow-api.service';
+
+type PanelTab = 'tasks' | 'collaborators';
 
 @Component({
   selector: 'app-policy-editor-page',
@@ -26,13 +29,18 @@ import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
     RouterLink,
     MatButtonModule,
     MatIconModule,
-    BpmnEditorComponent
+    BpmnEditorComponent,
+    TasksPanelComponent,
+    FormPanelComponent,
+    CollaboratorsPanelComponent
   ],
   template: `
     <div class="editor-layout" *ngIf="!loading() && !errorMessage(); else stateTpl">
+
+      <!-- Toolbar -->
       <header class="editor-toolbar">
         <div class="editor-toolbar__left">
-          <a mat-icon-button routerLink="/design" aria-label="Volver a politicas">
+          <a mat-icon-button routerLink="/design" aria-label="Volver">
             <mat-icon>arrow_back</mat-icon>
           </a>
           <div class="editor-toolbar__meta">
@@ -42,27 +50,84 @@ import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
             </span>
           </div>
         </div>
-
         <div class="editor-toolbar__right">
-          <button
-            mat-stroked-button
-            [disabled]="saving()"
-            (click)="save()"
-          >
+          <button mat-stroked-button [disabled]="saving()" (click)="save()">
             <mat-icon>save</mat-icon>
             {{ saving() ? 'Guardando...' : 'Guardar' }}
           </button>
         </div>
       </header>
 
-      <main class="editor-main">
-        <app-bpmn-editor
-          [xml]="currentXml()"
-          (xmlChange)="currentXml.set($event)"
-        />
-      </main>
+      <!-- Body -->
+      <div class="editor-body">
+
+        <!-- Canvas -->
+        <div class="editor-canvas">
+          <app-bpmn-editor
+            [xml]="currentXml()"
+            (xmlChange)="currentXml.set($event)"
+          />
+        </div>
+
+        <!-- Panel lateral -->
+        <aside class="editor-panel">
+
+          <!-- Tabs -->
+          <div class="panel-tabs">
+            <button
+              class="panel-tab"
+              [class.is-active]="activeTab() === 'tasks'"
+              (click)="activeTab.set('tasks'); selectedTask.set(null)"
+            >
+              <mat-icon>pending_actions</mat-icon>
+              Tareas
+            </button>
+            <button
+              class="panel-tab"
+              [class.is-active]="activeTab() === 'collaborators'"
+              (click)="activeTab.set('collaborators')"
+            >
+              <mat-icon>group</mat-icon>
+              Equipo
+            </button>
+          </div>
+
+          <!-- Contenido del panel -->
+          <div class="panel-body">
+
+            <!-- Tab Tareas -->
+            <ng-container *ngIf="activeTab() === 'tasks'">
+              <app-form-panel
+                *ngIf="selectedTask(); else tasksList"
+                [task]="selectedTask()!"
+                [workflowId]="snapshot()!.workflow.id"
+                (back)="selectedTask.set(null)"
+                (formUpdated)="onFormUpdated()"
+              />
+              <ng-template #tasksList>
+                <app-tasks-panel
+                  [tasks]="snapshot()?.tasks ?? []"
+                  [forms]="snapshot()?.forms ?? []"
+                  (taskSelected)="selectedTask.set($event)"
+                />
+              </ng-template>
+            </ng-container>
+
+            <!-- Tab Colaboradores -->
+            <app-collaborators-panel
+              *ngIf="activeTab() === 'collaborators'"
+              [workflowId]="snapshot()!.workflow.id"
+              [collaborators]="snapshot()?.collaborators ?? []"
+              [invitations]="snapshot()?.invitations ?? []"
+              (collaboratorAdded)="reloadSnapshot()"
+            />
+
+          </div>
+        </aside>
+      </div>
     </div>
 
+    <!-- Estado carga / error -->
     <ng-template #stateTpl>
       <div class="editor-state">
         <ng-container *ngIf="loading()">
@@ -92,6 +157,7 @@ import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
       height: 100%;
     }
 
+    /* Toolbar */
     .editor-toolbar {
       display: flex;
       align-items: center;
@@ -116,7 +182,6 @@ import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
       display: flex;
       align-items: center;
       gap: 8px;
-      min-width: 0;
     }
 
     .editor-toolbar__name {
@@ -136,12 +201,77 @@ import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
       flex-shrink: 0;
     }
 
-    .editor-main {
+    /* Body */
+    .editor-body {
+      display: flex;
       flex: 1;
       min-height: 0;
       overflow: hidden;
     }
 
+    .editor-canvas {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* Panel lateral */
+    .editor-panel {
+      width: 300px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .panel-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex: 1;
+      padding: 10px 8px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 120ms ease, border-color 120ms ease;
+    }
+
+    .panel-tab mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    .panel-tab:hover {
+      color: var(--text);
+    }
+
+    .panel-tab.is-active {
+      color: var(--accent-strong);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 0;
+    }
+
+    /* Status badge */
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -169,6 +299,7 @@ import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
       color: var(--text-muted);
     }
 
+    /* Estado carga/error */
     .editor-state {
       display: grid;
       place-items: center;
@@ -202,17 +333,19 @@ export class PolicyEditorPageComponent {
   protected readonly saving = signal(false);
   protected readonly snapshot = signal<WorkflowEditorSnapshot | null>(null);
   protected readonly currentXml = signal('');
+  protected readonly activeTab = signal<PanelTab>('tasks');
+  protected readonly selectedTask = signal<WorkflowTask | null>(null);
+
+  private readonly workflowId: string;
 
   constructor() {
-    const id = this.route.snapshot.paramMap.get('id') ?? '';
-    this.loadSnapshot(id);
+    this.workflowId = this.route.snapshot.paramMap.get('id') ?? '';
+    this.loadSnapshot();
   }
 
   protected save(): void {
     const snap = this.snapshot();
-    if (!snap || this.saving()) {
-      return;
-    }
+    if (!snap || this.saving()) return;
 
     this.saving.set(true);
 
@@ -223,9 +356,7 @@ export class PolicyEditorPageComponent {
     };
 
     this.workflowApi.updateWorkflow(snap.workflow.id, payload).subscribe({
-      next: () => {
-        this.saving.set(false);
-      },
+      next: () => this.saving.set(false),
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;
         this.errorMessage.set(apiError?.message || 'No fue posible guardar los cambios.');
@@ -234,12 +365,19 @@ export class PolicyEditorPageComponent {
     });
   }
 
+  protected reloadSnapshot(): void {
+    this.loadSnapshot();
+  }
+
+  protected onFormUpdated(): void {
+    this.loadSnapshot();
+    this.selectedTask.set(null);
+  }
+
   protected statusLabel(status: WorkflowStatus | undefined): string {
     if (!status) return '';
     const labels: Record<WorkflowStatus, string> = {
-      DRAFT: 'Borrador',
-      PUBLISHED: 'Publicada',
-      ARCHIVED: 'Archivada'
+      DRAFT: 'Borrador', PUBLISHED: 'Publicada', ARCHIVED: 'Archivada'
     };
     return labels[status] ?? status;
   }
@@ -254,23 +392,23 @@ export class PolicyEditorPageComponent {
     return classes[status] ?? '';
   }
 
-  private loadSnapshot(id: string): void {
+  private loadSnapshot(): void {
     this.loading.set(true);
     this.errorMessage.set('');
 
-    this.workflowApi.getEditorSnapshot(id).subscribe({
+    this.workflowApi.getEditorSnapshot(this.workflowId).subscribe({
       next: (snapshot) => {
         this.snapshot.set(snapshot);
-        this.currentXml.set(snapshot.workflow.draftBpmnXml);
+        if (!this.currentXml()) {
+          this.currentXml.set(snapshot.workflow.draftBpmnXml);
+        }
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;
         this.errorMessage.set(apiError?.message || 'No fue posible cargar la politica.');
         this.loading.set(false);
       },
-      complete: () => {
-        this.loading.set(false);
-      }
+      complete: () => this.loading.set(false)
     });
   }
 }

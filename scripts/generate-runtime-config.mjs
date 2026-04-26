@@ -33,6 +33,7 @@ function readDotEnv(filePath) {
 
 const envValues = readDotEnv(envPath);
 const apiBaseUrl = process.env.API_BASE_URL || envValues.API_BASE_URL;
+const wsBaseUrl = process.env.WS_BASE_URL || envValues.WS_BASE_URL || '';
 
 if (!apiBaseUrl) {
   throw new Error('API_BASE_URL is required in .env or environment variables.');
@@ -41,7 +42,8 @@ if (!apiBaseUrl) {
 const fileContent = `import { AppConfig } from './app-config.model';
 
 export const GENERATED_RUNTIME_CONFIG: AppConfig = {
-  apiBaseUrl: ${JSON.stringify(apiBaseUrl)}
+  apiBaseUrl: ${JSON.stringify(apiBaseUrl)},
+  wsBaseUrl: ${JSON.stringify(wsBaseUrl)}
 };
 `;
 

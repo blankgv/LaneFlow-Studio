@@ -20,4 +20,12 @@ export class AppConfigService {
 
     return this.config.apiBaseUrl.replace(/\/+$/, '');
   }
+
+  get wsBaseUrl(): string {
+    if (!this.config.wsBaseUrl || this.config.wsBaseUrl === '__WS_BASE_URL__') {
+      return '';
+    }
+
+    return this.config.wsBaseUrl.replace(/\/+$/, '');
+  }
 }

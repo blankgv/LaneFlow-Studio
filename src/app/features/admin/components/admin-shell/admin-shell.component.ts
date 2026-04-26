@@ -37,6 +37,16 @@ interface NavItem {
           <span>Dashboard</span>
         </button>
 
+        <a
+          *ngIf="canDesign"
+          class="nav-item"
+          routerLink="/design"
+          routerLinkActive="is-active"
+        >
+          <mat-icon>account_tree</mat-icon>
+          <span>Politicas</span>
+        </a>
+
         <section class="nav-section">
           <button
             type="button"
@@ -296,6 +306,8 @@ interface NavItem {
 export class AdminShellComponent {
   protected readonly authSession = inject(AuthSessionService);
   protected readonly adminExpanded = signal(true);
+
+  protected readonly canDesign = this.authSession.hasPermission('WORKFLOW_READ');
 
   protected readonly adminNav: NavItem[] = [
     { label: 'Departamentos', icon: 'apartment', link: '/admin/departments' },

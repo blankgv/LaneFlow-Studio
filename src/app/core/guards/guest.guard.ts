@@ -2,6 +2,7 @@ import { CanActivateFn, Router } from '@angular/router';
 import { inject } from '@angular/core';
 
 import { AuthSessionService } from '../../features/auth/services/auth-session.service';
+import { resolveHomeRoute } from '../utils/resolve-home-route';
 
 export const guestGuard: CanActivateFn = () => {
   const authSession = inject(AuthSessionService);
@@ -11,5 +12,5 @@ export const guestGuard: CanActivateFn = () => {
     return true;
   }
 
-  return router.createUrlTree(['/auth/session']);
+  return router.createUrlTree(resolveHomeRoute(authSession));
 };

@@ -1,24 +1,25 @@
 import { Routes } from '@angular/router';
 
+import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
+import { permissionGuard } from './core/guards/permission.guard';
+import { AppShellComponent } from './layout/app-shell/app-shell.component';
 import { RecoverAccessPageComponent } from './features/auth/pages/recover-access-page.component';
 import { ResetPasswordPageComponent } from './features/auth/pages/reset-password-page.component';
-import { ShellComponent } from './layout/shell/shell.component';
+import { DashboardPageComponent } from './features/dashboard/pages/dashboard-page.component';
+import { PolicyEditorPageComponent } from './features/design/pages/policy-editor-page.component';
 
 export const appRoutes: Routes = [
+  // Authenticated app shell — all pages with sidebar
   {
     path: '',
-    component: ShellComponent,
+    component: AppShellComponent,
+    canActivate: [authGuard],
     children: [
       {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'auth/login'
-      },
-      {
-        path: 'auth',
-        loadChildren: () =>
-          import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES)
+        component: DashboardPageComponent
       },
       {
         path: 'admin',
@@ -29,23 +30,23 @@ export const appRoutes: Routes = [
         path: 'design',
         loadChildren: () =>
           import('./features/design/design.routes').then((m) => m.DESIGN_ROUTES)
-      },
-      {
-        path: 'operation',
-        loadChildren: () =>
-          import('./features/operation/operation.routes').then((m) => m.OPERATION_ROUTES)
-      },
-      {
-        path: 'tracking',
-        loadChildren: () =>
-          import('./features/tracking/tracking.routes').then((m) => m.TRACKING_ROUTES)
-      },
-      {
-        path: 'analytics',
-        loadChildren: () =>
-          import('./features/analytics/analytics.routes').then((m) => m.ANALYTICS_ROUTES)
       }
     ]
+  },
+
+  // Full-screen editor — authenticated but without sidebar
+  {
+    path: 'design/:id/editor',
+    canActivate: [authGuard, permissionGuard],
+    data: { permissions: ['WORKFLOW_READ'] },
+    component: PolicyEditorPageComponent
+  },
+
+  // Auth routes
+  {
+    path: 'auth',
+    loadChildren: () =>
+      import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES)
   },
   {
     path: 'recover-access',
@@ -57,8 +58,6 @@ export const appRoutes: Routes = [
     canActivate: [guestGuard],
     component: ResetPasswordPageComponent
   },
-  {
-    path: '**',
-    redirectTo: ''
-  }
+
+  { path: '**', redirectTo: '' }
 ];

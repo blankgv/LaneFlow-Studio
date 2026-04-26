@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 
 import { ApiError } from '../../../core/models/api-error.model';
+import { resolveHomeRoute } from '../../../core/utils/resolve-home-route';
 import { AuthAccessLayoutComponent } from '../components/auth-access-layout/auth-access-layout.component';
 import { AuthHeroComponent } from '../components/auth-hero/auth-hero.component';
 import { LoginFormComponent } from '../components/login-form/login-form.component';
@@ -85,16 +86,6 @@ export class LoginPageComponent {
       : ''
   );
 
-  private resolveHomeRoute(): string[] {
-    const has = (p: string) => this.authSession.hasPermission(p);
-    if (has('WORKFLOW_READ')) return ['/design'];
-    if (has('STAFF_READ'))    return ['/admin/staff'];
-    if (has('DEPT_READ'))     return ['/admin/departments'];
-    if (has('ROLE_READ'))     return ['/admin/roles'];
-    if (has('USER_READ'))     return ['/admin/users'];
-    return ['/auth/session'];
-  }
-
   protected onLogin(credentials: LoginCredentials): void {
     this.isSubmitting.set(true);
     this.errorMessage.set('');
@@ -102,7 +93,7 @@ export class LoginPageComponent {
 
     this.authSession.login(credentials).subscribe({
       next: () => {
-        void this.router.navigate(this.resolveHomeRoute());
+        void this.router.navigate(resolveHomeRoute(this.authSession));
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;

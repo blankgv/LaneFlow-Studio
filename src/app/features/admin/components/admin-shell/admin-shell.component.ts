@@ -37,15 +37,32 @@ interface NavItem {
           <span>Dashboard</span>
         </button>
 
-        <a
-          *ngIf="canDesign"
-          class="nav-item"
-          routerLink="/design"
-          routerLinkActive="is-active"
-        >
-          <mat-icon>account_tree</mat-icon>
-          <span>Politicas</span>
-        </a>
+        <section class="nav-section" *ngIf="canDesign">
+          <button
+            type="button"
+            class="nav-section__trigger"
+            [class.is-open]="designExpanded()"
+            (click)="toggleDesignExpanded()"
+          >
+            <span class="nav-section__title">
+              <mat-icon>account_tree</mat-icon>
+              <span>Diseno</span>
+            </span>
+            <mat-icon class="nav-section__chevron">expand_more</mat-icon>
+          </button>
+
+          <div class="nav-section__items" *ngIf="designExpanded()">
+            <a
+              *ngFor="let item of designNav"
+              class="nav-item"
+              [routerLink]="item.link"
+              routerLinkActive="is-active"
+            >
+              <mat-icon>{{ item.icon }}</mat-icon>
+              <span>{{ item.label }}</span>
+            </a>
+          </div>
+        </section>
 
         <section class="nav-section">
           <button
@@ -98,7 +115,7 @@ interface NavItem {
 
     .sidebar {
       display: grid;
-      grid-template-rows: auto auto auto 1fr auto;
+      grid-template-rows: auto auto auto auto 1fr auto;
       gap: 6px;
       padding: 18px 14px;
       background: var(--surface);
@@ -296,7 +313,7 @@ interface NavItem {
       }
 
       .sidebar {
-        grid-template-rows: auto auto auto auto auto;
+        grid-template-rows: auto auto auto auto auto auto;
         border-right: 0;
         border-bottom: 1px solid var(--border);
       }
@@ -306,8 +323,13 @@ interface NavItem {
 export class AdminShellComponent {
   protected readonly authSession = inject(AuthSessionService);
   protected readonly adminExpanded = signal(true);
+  protected readonly designExpanded = signal(true);
 
   protected readonly canDesign = this.authSession.hasPermission('WORKFLOW_READ');
+
+  protected readonly designNav: NavItem[] = [
+    { label: 'Politicas', icon: 'policy', link: '/design' }
+  ];
 
   protected readonly adminNav: NavItem[] = [
     { label: 'Departamentos', icon: 'apartment', link: '/admin/departments' },
@@ -332,6 +354,10 @@ export class AdminShellComponent {
 
     return (parts[0][0] + parts[1][0]).toUpperCase();
   });
+
+  protected toggleDesignExpanded(): void {
+    this.designExpanded.update((value) => !value);
+  }
 
   protected toggleAdminExpanded(): void {
     this.adminExpanded.update((value) => !value);

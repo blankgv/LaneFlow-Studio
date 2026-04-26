@@ -85,6 +85,16 @@ export class LoginPageComponent {
       : ''
   );
 
+  private resolveHomeRoute(): string[] {
+    const has = (p: string) => this.authSession.hasPermission(p);
+    if (has('WORKFLOW_READ')) return ['/design'];
+    if (has('STAFF_READ'))    return ['/admin/staff'];
+    if (has('DEPT_READ'))     return ['/admin/departments'];
+    if (has('ROLE_READ'))     return ['/admin/roles'];
+    if (has('USER_READ'))     return ['/admin/users'];
+    return ['/auth/session'];
+  }
+
   protected onLogin(credentials: LoginCredentials): void {
     this.isSubmitting.set(true);
     this.errorMessage.set('');
@@ -92,9 +102,7 @@ export class LoginPageComponent {
 
     this.authSession.login(credentials).subscribe({
       next: () => {
-        void this.router.navigate(
-          this.authSession.hasPermission('STAFF_READ') ? ['/admin/staff'] : ['/auth/session']
-        );
+        void this.router.navigate(this.resolveHomeRoute());
       },
       error: (error: HttpErrorResponse) => {
         const apiError = error.error as Partial<ApiError> | null;

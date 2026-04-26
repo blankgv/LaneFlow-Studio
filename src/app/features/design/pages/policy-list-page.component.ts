@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -12,6 +12,7 @@ import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AdminPageHeaderComponent } from '../../admin/components/admin-page-header/admin-page-header.component';
 import { AdminSearchBarComponent } from '../../admin/components/admin-search-bar/admin-search-bar.component';
 import { CollaboratorsDialogComponent } from '../components/collaborators-dialog/collaborators-dialog.component';
+import { Invitation } from '../models/invitation.model';
 import { WorkflowSummary } from '../models/workflow-summary.model';
 import { WorkflowStatus } from '../models/workflow.model';
 import { WorkflowApiService } from '../services/workflow-api.service';
@@ -38,6 +39,26 @@ import { WorkflowApiService } from '../services/workflow-api.service';
       />
 
       <div class="admin-page__alert" *ngIf="errorMessage()">{{ errorMessage() }}</div>
+
+      <!-- Banner invitaciones pendientes -->
+      <div class="invitations-banner" *ngIf="pendingInvitations().length > 0">
+        <div class="invitations-banner__header">
+          <mat-icon>mail</mat-icon>
+          <span>Tienes <strong>{{ pendingInvitations().length }}</strong> invitacion{{ pendingInvitations().length > 1 ? 'es' : '' }} pendiente{{ pendingInvitations().length > 1 ? 's' : '' }} para colaborar en politicas.</span>
+        </div>
+        <ul class="invitations-banner__list">
+          <li *ngFor="let inv of pendingInvitations()" class="inv-row">
+            <span class="inv-row__name">{{ inv.workflowName || inv.workflowDefinitionId }}</span>
+            <span class="inv-row__by">por <strong>{{ inv.invitedByUsername }}</strong></span>
+            <div class="inv-row__actions">
+              <button mat-stroked-button class="btn-reject" [disabled]="responding() === inv.id" (click)="respond(inv, 'reject')">Rechazar</button>
+              <button mat-flat-button color="primary" [disabled]="responding() === inv.id" (click)="respond(inv, 'accept')">
+                {{ responding() === inv.id ? '...' : 'Aceptar' }}
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
 
       <div class="admin-page__toolbar">
         <app-admin-search-bar
@@ -192,9 +213,82 @@ import { WorkflowApiService } from '../services/workflow-api.service';
       font-size: 0.82rem;
       color: var(--text-muted);
     }
+
+    /* Banner invitaciones */
+    .invitations-banner {
+      margin: 0 0 16px;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      background: var(--accent-soft);
+      overflow: hidden;
+    }
+
+    .invitations-banner__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      font-size: 0.86rem;
+      color: var(--text);
+    }
+
+    .invitations-banner__header mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: var(--accent-strong);
+      flex-shrink: 0;
+    }
+
+    .invitations-banner__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .inv-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      background: var(--surface);
+    }
+
+    .inv-row:last-child {
+      border-bottom: 0;
+    }
+
+    .inv-row__name {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .inv-row__by {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .inv-row__actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-reject {
+      font-size: 0.82rem;
+    }
   `]
 })
-export class PolicyListPageComponent {
+export class PolicyListPageComponent implements OnInit {
   private readonly workflowApi = inject(WorkflowApiService);
   private readonly authSession = inject(AuthSessionService);
   private readonly dialog = inject(MatDialog);
@@ -203,6 +297,8 @@ export class PolicyListPageComponent {
   protected readonly errorMessage = signal('');
   protected readonly policies = signal<WorkflowSummary[]>([]);
   protected readonly searchTerm = signal('');
+  protected readonly pendingInvitations = signal<(Invitation & { workflowName?: string })[]>([]);
+  protected readonly responding = signal('');
   protected readonly canWrite = this.authSession.hasPermission('WORKFLOW_WRITE');
   protected readonly displayedColumns = ['code', 'name', 'status', 'version', 'updatedAt', 'actions'];
 
@@ -222,6 +318,27 @@ export class PolicyListPageComponent {
 
   constructor() {
     this.loadPolicies();
+  }
+
+  ngOnInit(): void {
+    this.loadInvitations();
+  }
+
+  protected respond(inv: Invitation, action: 'accept' | 'reject'): void {
+    this.responding.set(inv.id);
+
+    const call = action === 'accept'
+      ? this.workflowApi.acceptInvitation(inv.id)
+      : this.workflowApi.rejectInvitation(inv.id);
+
+    call.subscribe({
+      next: () => {
+        this.pendingInvitations.update((list) => list.filter((i) => i.id !== inv.id));
+        this.responding.set('');
+        if (action === 'accept') this.loadPolicies();
+      },
+      error: () => this.responding.set('')
+    });
   }
 
   protected openCollaborators(item: WorkflowSummary): void {
@@ -265,6 +382,20 @@ export class PolicyListPageComponent {
       complete: () => {
         this.loading.set(false);
       }
+    });
+  }
+
+  private loadInvitations(): void {
+    this.workflowApi.getMyInvitations().subscribe({
+      next: (list) => {
+        this.pendingInvitations.set(
+          list.filter((i) => i.status === 'PENDING').map((i) => ({
+            ...i,
+            workflowName: (i as any).workflowName ?? undefined
+          }))
+        );
+      },
+      error: () => {}
     });
   }
 }

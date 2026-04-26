@@ -54,12 +54,16 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
             <span class="status-badge" [ngClass]="statusClass(snapshot()?.workflow?.status)">
               {{ statusLabel(snapshot()?.workflow?.status) }}
             </span>
+            <span class="readonly-badge" *ngIf="snapshot() && !snapshot()!.canEdit">
+              <mat-icon>lock</mat-icon>
+              Solo lectura
+            </span>
           </div>
         </div>
 
         <app-presence-indicator [session]="collaboration" />
 
-        <div class="editor-toolbar__right">
+        <div class="editor-toolbar__right" *ngIf="snapshot()?.canEdit">
           <!-- Indicador autosave -->
           <span class="save-indicator" [ngClass]="'save-indicator--' + saveState()">
             <mat-icon>{{ saveStateIcon() }}</mat-icon>
@@ -100,6 +104,7 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
         <div class="editor-canvas">
           <app-bpmn-editor
             [xml]="currentXml()"
+            [readonly]="!snapshot()?.canEdit"
             (xmlChange)="onXmlChange($event)"
             (flowSelected)="onFlowSelected($event)"
           />
@@ -302,6 +307,25 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+    }
+
+    .readonly-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--surface-3);
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .readonly-badge mat-icon {
+      font-size: 12px;
+      width: 12px;
+      height: 12px;
     }
 
     /* Save indicator */
@@ -729,14 +753,19 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
 
     this.collaboration = this.collaborationService.connect(this.workflowId);
 
+    const myUsername = this.authSession.session()?.username;
+
     this.collaboration?.draft$.pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((sync) => {
+      // Ignorar mensajes propios
+      if (sync.lastModifiedBy && sync.lastModifiedBy === myUsername) return;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = sync as any;
       const xml: string = raw['bpmnXml'] ?? raw['xml'] ?? raw['bpmn_xml'] ?? '';
 
-      if (!xml || xml === this.currentXml()) return;
+      if (!xml) return;
 
       this.currentXml.set(xml);
 
@@ -783,13 +812,31 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
       next: () => {
         this.saveState.set('saved');
       },
-      error: () => this.saveState.set('error')
+      error: (err: HttpErrorResponse) => {
+        // 409 = conflicto de concurrencia con WebSocket draft.save
+        // Los datos ya se guardaron via WebSocket, no es un error real
+        if (err.status === 409) {
+          this.saveState.set('saved');
+        } else {
+          this.saveState.set('error');
+        }
+      }
     });
   }
 
   protected publish(): void {
     const snap = this.snapshot();
     if (!snap || this.publishing()) return;
+
+    // Pre-validación en cliente
+    const tasksWithoutLane = snap.tasks.filter((t) => !t.swimlaneId);
+    if (tasksWithoutLane.length > 0) {
+      const names = tasksWithoutLane.map((t) => t.nodeName || t.nodeId).join(', ');
+      this.publishError.set(
+        `Las siguientes tareas no tienen lane/departamento asignado: ${names}. Asígnalas a una lane antes de publicar.`
+      );
+      return;
+    }
 
     this.publishing.set(true);
     this.publishError.set('');

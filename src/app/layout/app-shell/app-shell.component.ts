@@ -58,6 +58,11 @@ interface NavItem {
             </div>
           </section>
 
+          <a class="nav-item" routerLink="/operation/tasks" routerLinkActive="is-active">
+            <mat-icon>assignment</mat-icon>
+            <span>Tareas</span>
+          </a>
+
           <section class="nav-section" *ngIf="canAdmin">
             <button
               type="button"

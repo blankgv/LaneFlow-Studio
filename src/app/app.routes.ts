@@ -30,6 +30,11 @@ export const appRoutes: Routes = [
         path: 'design',
         loadChildren: () =>
           import('./features/design/design.routes').then((m) => m.DESIGN_ROUTES)
+      },
+      {
+        path: 'operation',
+        loadChildren: () =>
+          import('./features/operation/operation.routes').then((m) => m.OPERATION_ROUTES)
       }
     ]
   },

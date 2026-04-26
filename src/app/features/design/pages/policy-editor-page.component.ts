@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import {
-  ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal
+  ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, OnInit, ViewChild, inject, signal
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -10,14 +10,17 @@ import { MatIconModule } from '@angular/material/icon';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 import { ApiError } from '../../../core/models/api-error.model';
+import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { BpmnEditorComponent } from '../components/bpmn-editor/bpmn-editor.component';
 import { FormPanelComponent } from '../components/form-panel/form-panel.component';
+import { PresenceIndicatorComponent } from '../components/presence-indicator/presence-indicator.component';
 import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
 import { WorkflowEditorSnapshot } from '../models/workflow-editor-snapshot.model';
 import { WorkflowStatus } from '../models/workflow.model';
 import { WorkflowTask } from '../models/workflow-task.model';
 import { WorkflowUpdatePayload } from '../models/workflow-payload.model';
 import { WorkflowVersion } from '../models/workflow-version.model';
+import { CollaborationSession, WorkflowCollaborationService } from '../services/workflow-collaboration.service';
 import { WorkflowApiService } from '../services/workflow-api.service';
 
 type PanelTab = 'tasks' | 'history';
@@ -34,7 +37,8 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
     MatIconModule,
     BpmnEditorComponent,
     TasksPanelComponent,
-    FormPanelComponent
+    FormPanelComponent,
+    PresenceIndicatorComponent
   ],
   template: `
     <div class="editor-layout" *ngIf="!loading() && !errorMessage(); else stateTpl">
@@ -52,6 +56,8 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
             </span>
           </div>
         </div>
+
+        <app-presence-indicator [session]="collaboration" />
 
         <div class="editor-toolbar__right">
           <!-- Indicador autosave -->
@@ -534,9 +540,11 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
     }
   `]
 })
-export class PolicyEditorPageComponent implements OnInit {
+export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly workflowApi = inject(WorkflowApiService);
+  private readonly collaborationService = inject(WorkflowCollaborationService);
+  private readonly authSession = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(true);
@@ -551,6 +559,10 @@ export class PolicyEditorPageComponent implements OnInit {
   protected readonly versions = signal<WorkflowVersion[]>([]);
   protected readonly loadingHistory = signal(false);
 
+  protected collaboration: CollaborationSession | null = null;
+
+  @ViewChild(BpmnEditorComponent) private bpmnEditor?: BpmnEditorComponent;
+
   private readonly workflowId: string;
   private readonly xmlChange$ = new Subject<string>();
 
@@ -561,6 +573,28 @@ export class PolicyEditorPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadSnapshot();
 
+    this.collaboration = this.collaborationService.connect(this.workflowId);
+
+    this.collaboration?.draft$.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((sync) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = sync as any;
+      const xml: string = raw['bpmnXml'] ?? raw['xml'] ?? raw['bpmn_xml'] ?? '';
+
+      if (!xml || xml === this.currentXml()) return;
+
+      this.currentXml.set(xml);
+
+      if (this.bpmnEditor) {
+        this.bpmnEditor.applyRemoteXml(xml);
+      } else {
+        setTimeout(() => this.bpmnEditor?.applyRemoteXml(xml), 0);
+      }
+
+      this.refreshSnapshot();
+    });
+
     this.xmlChange$.pipe(
       debounceTime(2000),
       distinctUntilChanged(),
@@ -568,9 +602,14 @@ export class PolicyEditorPageComponent implements OnInit {
     ).subscribe(() => this.save());
   }
 
+  ngOnDestroy(): void {
+    this.collaboration?.disconnect();
+  }
+
   protected onXmlChange(xml: string): void {
     this.currentXml.set(xml);
     this.saveState.set('pending');
+    this.collaboration?.publishDraft(xml);
     this.xmlChange$.next(xml);
   }
 
@@ -587,7 +626,9 @@ export class PolicyEditorPageComponent implements OnInit {
     };
 
     this.workflowApi.updateWorkflow(snap.workflow.id, payload).subscribe({
-      next: () => this.saveState.set('saved'),
+      next: () => {
+        this.saveState.set('saved');
+      },
       error: () => this.saveState.set('error')
     });
   }
@@ -680,6 +721,13 @@ export class PolicyEditorPageComponent implements OnInit {
       ARCHIVED: 'status-badge--archived'
     };
     return classes[status] ?? '';
+  }
+
+  private refreshSnapshot(): void {
+    this.workflowApi.getEditorSnapshot(this.workflowId).subscribe({
+      next: (snapshot) => this.snapshot.set(snapshot),
+      error: () => {}
+    });
   }
 
   private loadSnapshot(): void {

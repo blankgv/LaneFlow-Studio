@@ -43,6 +43,7 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private modeler!: BpmnModeler;
   private initialized = false;
   private lastImportedXml = '';
+  private suppressNextEmit = false;
 
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
@@ -52,6 +53,10 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this.modeler as any).on('commandStack.changed', () => {
+        if (this.suppressNextEmit) {
+          this.suppressNextEmit = false;
+          return;
+        }
         this.modeler.saveXML({ format: true }).then(({ xml }) => {
           if (xml) {
             this.lastImportedXml = xml;
@@ -86,6 +91,20 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   ngOnDestroy(): void {
     this.modeler?.destroy();
+  }
+
+  /**
+   * Importa XML recibido de otro usuario sin disparar autosave.
+   */
+  applyRemoteXml(xml: string): void {
+    if (!this.initialized || !xml) return;
+    this.zone.runOutsideAngular(() => {
+      this.suppressNextEmit = true;
+      this.lastImportedXml = xml;
+      this.modeler.importXML(xml)
+        .then(() => { this.suppressNextEmit = false; })
+        .catch(() => { this.suppressNextEmit = false; });
+    });
   }
 
   private importXml(xml: string): Promise<void> {

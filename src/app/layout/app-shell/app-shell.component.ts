@@ -58,6 +58,21 @@ interface NavItem {
             </div>
           </section>
 
+          <a class="nav-item" routerLink="/operation/procedures" routerLinkActive="is-active">
+            <mat-icon>folder_open</mat-icon>
+            <span>Tramites</span>
+          </a>
+
+          <a class="nav-item" routerLink="/operation/start" routerLinkActive="is-active">
+            <mat-icon>play_circle</mat-icon>
+            <span>Iniciar tramite</span>
+          </a>
+
+          <a class="nav-item" routerLink="/operation/applicants" routerLinkActive="is-active">
+            <mat-icon>person_add</mat-icon>
+            <span>Solicitantes</span>
+          </a>
+
           <a class="nav-item" routerLink="/operation/tasks" routerLinkActive="is-active">
             <mat-icon>assignment</mat-icon>
             <span>Tareas</span>

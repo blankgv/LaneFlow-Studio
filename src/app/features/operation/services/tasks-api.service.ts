@@ -24,7 +24,19 @@ export class TasksApiService {
     return this.api.post<TaskInstance>(`/tasks/${taskId}/claim`, {});
   }
 
-  completeTask(taskId: string, variables: Record<string, unknown>): Observable<void> {
-    return this.api.post<void>(`/tasks/${taskId}/complete`, { variables });
+  completeTask(taskId: string, formData: Record<string, unknown>, comment = ''): Observable<void> {
+    return this.api.post<void>(`/tasks/${taskId}/complete`, { comment, formData });
+  }
+
+  approveTask(taskId: string, formData: Record<string, unknown>, comment = ''): Observable<void> {
+    return this.api.post<void>(`/tasks/${taskId}/approve`, { comment, formData });
+  }
+
+  observeTask(taskId: string, formData: Record<string, unknown>, comment = ''): Observable<void> {
+    return this.api.post<void>(`/tasks/${taskId}/observe`, { comment, formData });
+  }
+
+  rejectTask(taskId: string, formData: Record<string, unknown>, comment = ''): Observable<void> {
+    return this.api.post<void>(`/tasks/${taskId}/reject`, { comment, formData });
   }
 }

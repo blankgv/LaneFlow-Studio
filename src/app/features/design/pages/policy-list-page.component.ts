@@ -12,6 +12,7 @@ import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AdminPageHeaderComponent } from '../../admin/components/admin-page-header/admin-page-header.component';
 import { AdminSearchBarComponent } from '../../admin/components/admin-search-bar/admin-search-bar.component';
 import { CollaboratorsDialogComponent } from '../components/collaborators-dialog/collaborators-dialog.component';
+import { CreatePolicyDialogComponent } from '../components/create-policy-dialog/create-policy-dialog.component';
 import { Invitation } from '../models/invitation.model';
 import { WorkflowSummary } from '../models/workflow-summary.model';
 import { WorkflowStatus } from '../models/workflow.model';
@@ -68,10 +69,10 @@ import { WorkflowApiService } from '../services/workflow-api.service';
           (valueChange)="searchTerm.set($event)"
         />
 
-        <a *ngIf="canWrite" mat-flat-button color="primary" [routerLink]="['/design/new']">
+        <button *ngIf="canWrite" mat-flat-button color="primary" (click)="openCreateDialog()">
           <mat-icon>add</mat-icon>
           Nueva politica
-        </a>
+        </button>
       </div>
 
       <div class="data-table">
@@ -338,6 +339,16 @@ export class PolicyListPageComponent implements OnInit {
         if (action === 'accept') this.loadPolicies();
       },
       error: () => this.responding.set('')
+    });
+  }
+
+  protected openCreateDialog(): void {
+    const ref = this.dialog.open(CreatePolicyDialogComponent, {
+      panelClass: 'create-policy-dialog-panel'
+    });
+
+    ref.afterClosed().subscribe((created) => {
+      if (created) this.loadPolicies();
     });
   }
 

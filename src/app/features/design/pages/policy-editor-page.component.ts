@@ -802,31 +802,47 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
 
     this.saveState.set('saving');
 
-    const payload: WorkflowUpdatePayload = {
-      name: snap.workflow.name,
-      description: snap.workflow.description,
-      bpmnXml: this.currentXml()
-    };
+    void this.getPreparedBpmnXml().then((bpmnXml) => {
+      const payload: WorkflowUpdatePayload = {
+        name: snap.workflow.name,
+        description: snap.workflow.description,
+        bpmnXml
+      };
 
-    this.workflowApi.updateWorkflow(snap.workflow.id, payload).subscribe({
-      next: () => {
-        this.saveState.set('saved');
-      },
-      error: (err: HttpErrorResponse) => {
-        // 409 = conflicto de concurrencia con WebSocket draft.save
-        // Los datos ya se guardaron via WebSocket, no es un error real
-        if (err.status === 409) {
+      this.workflowApi.updateWorkflow(snap.workflow.id, payload).subscribe({
+        next: () => {
+          this.currentXml.set(bpmnXml);
           this.saveState.set('saved');
-        } else {
-          this.saveState.set('error');
+          this.refreshSnapshot();
+        },
+        error: (err: HttpErrorResponse) => {
+          // 409 = conflicto de concurrencia con WebSocket draft.save
+          // Los datos ya se guardaron via WebSocket, no es un error real
+          if (err.status === 409) {
+            this.currentXml.set(bpmnXml);
+            this.saveState.set('saved');
+            this.refreshSnapshot();
+          } else {
+            this.saveState.set('error');
+          }
         }
-      }
+      });
+    }).catch(() => {
+      this.saveState.set('error');
     });
   }
 
   protected publish(): void {
     const snap = this.snapshot();
     if (!snap || this.publishing()) return;
+
+    const invalidProcessKey = this.invalidCamundaProcessKey(snap.workflow.camundaProcessKey);
+    if (invalidProcessKey) {
+      this.publishError.set(
+        `La clave tecnica de Camunda "${invalidProcessKey}" no es valida. Crea la politica con un codigo sin espacios, por ejemplo PRUEBA_CHIDA.`
+      );
+      return;
+    }
 
     // Pre-validación en cliente
     const tasksWithoutLane = snap.tasks.filter((t) => !t.swimlaneId);
@@ -848,19 +864,52 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
             this.snapshot.update((s) => s ? { ...s, workflow: updated } : s);
             this.publishing.set(false);
           },
-          error: (error: HttpErrorResponse) => {
-            const apiError = error.error as Partial<ApiError> | null;
+          error: (err: HttpErrorResponse) => {
+            const apiError = err.error as Partial<ApiError> | null;
             this.publishError.set(apiError?.message || 'No fue posible publicar la politica.');
             this.publishing.set(false);
           }
         });
       },
-      error: (error: HttpErrorResponse) => {
-        const apiError = error.error as Partial<ApiError> | null;
+      error: (err: HttpErrorResponse) => {
+        const apiError = err.error as Partial<ApiError> | null;
         this.publishError.set(apiError?.message || 'La politica no paso la validacion.');
         this.publishing.set(false);
       }
     });
+  }
+
+  /** Valida la estructura BPMN antes de publicar. Retorna mensaje de error o null si es válido. */
+  private validateBpmnStructure(snap: NonNullable<ReturnType<typeof this.snapshot>>): string | null {
+    // Validación desde snapshot (backend): tasks sin lane
+    const tasksWithoutLane = snap.tasks.filter((t) => !t.swimlaneId);
+    if (tasksWithoutLane.length > 0) {
+      const names = tasksWithoutLane.map((t) => t.nodeName || t.nodeId).join(', ');
+      return `Las siguientes tareas no tienen lane asignada: ${names}.`;
+    }
+
+    // Validación estructural del canvas (si el editor está activo)
+    if (!this.bpmnEditor) return null;
+    const summary: BpmnValidationSummary = this.bpmnEditor.getValidationSummary();
+
+    if (summary.pools > 1) {
+      return 'El diagrama tiene más de un pool. Solo se permite un pool por política.';
+    }
+
+    if (summary.lanes.length === 0) {
+      return 'El diagrama no tiene ninguna lane. Agrega al menos una lane con departamento asignado.';
+    }
+
+    const lanesWithoutDept = summary.lanes.filter((l) => !l.name.trim());
+    if (lanesWithoutDept.length > 0) {
+      return `Hay ${lanesWithoutDept.length} lane(s) sin departamento asignado. Asigna un departamento a cada lane antes de publicar.`;
+    }
+
+    if (summary.tasksOutsideLane > 0) {
+      return `Hay ${summary.tasksOutsideLane} tarea(s) fuera de una lane. Todas las tareas deben estar dentro de una lane.`;
+    }
+
+    return null;
   }
 
   protected canPublish(): boolean {

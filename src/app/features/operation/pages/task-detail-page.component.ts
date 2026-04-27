@@ -26,12 +26,12 @@ import { TasksApiService } from '../services/tasks-api.service';
           <mat-icon>arrow_back</mat-icon>
         </a>
         <div class="task-detail__meta">
-          <span class="task-detail__name">{{ task()?.taskName }}</span>
+          <span class="task-detail__name">{{ taskName() }}</span>
           <span class="task-detail__workflow">{{ task()?.workflowName }}</span>
         </div>
-        <span class="dept-chip" *ngIf="task()?.departmentName || task()?.departmentCode">
+        <span class="dept-chip" *ngIf="departmentLabel()">
           <mat-icon>corporate_fare</mat-icon>
-          {{ task()?.departmentName || task()?.departmentCode }}
+          {{ departmentLabel() }}
         </span>
       </header>
 
@@ -48,14 +48,14 @@ import { TasksApiService } from '../services/tasks-api.service';
       <div class="no-form" *ngIf="!task()?.form">
         <mat-icon>info_outline</mat-icon>
         <p>Esta tarea no tiene formulario asociado.<br>Puedes completarla directamente.</p>
-        <button mat-flat-button color="primary" [disabled]="completing()" (click)="complete()">
+        <button mat-flat-button color="primary" [disabled]="completing()" (click)="submitAction('complete')">
           <mat-icon>check_circle</mat-icon>
           {{ completing() ? 'Completando...' : 'Completar tarea' }}
         </button>
       </div>
 
       <!-- Formulario dinámico -->
-      <form class="task-form" (ngSubmit)="complete()" *ngIf="task()?.form">
+      <form class="task-form" (ngSubmit)="submitAction('complete')" *ngIf="task()?.form">
         <div class="task-form__title">
           <mat-icon>description</mat-icon>
           {{ task()!.form!.title }}
@@ -124,8 +124,30 @@ import { TasksApiService } from '../services/tasks-api.service';
           </div>
         </div>
 
+        <div class="form-field">
+          <label class="form-field__label">Comentario</label>
+          <textarea
+            class="form-field__input"
+            rows="3"
+            name="comment"
+            [(ngModel)]="comment"
+          ></textarea>
+        </div>
+
         <div class="task-form__actions">
           <a mat-stroked-button routerLink="/operation/tasks">Cancelar</a>
+          <button mat-stroked-button type="button" [disabled]="completing()" (click)="submitAction('observe')">
+            <mat-icon>visibility</mat-icon>
+            Observar
+          </button>
+          <button mat-stroked-button type="button" [disabled]="completing()" (click)="submitAction('reject')">
+            <mat-icon>cancel</mat-icon>
+            Rechazar
+          </button>
+          <button mat-stroked-button type="button" [disabled]="completing()" (click)="submitAction('approve')">
+            <mat-icon>thumb_up</mat-icon>
+            Aprobar
+          </button>
           <button mat-flat-button color="primary" type="submit" [disabled]="completing()">
             <mat-icon>check_circle</mat-icon>
             {{ completing() ? 'Completando...' : 'Completar tarea' }}
@@ -411,6 +433,7 @@ export class TaskDetailPageComponent implements OnInit {
   protected readonly loadError = signal('');
   protected readonly completing = signal(false);
   protected readonly completeError = signal('');
+  protected comment = '';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected values: Record<string, any> = {};
@@ -422,14 +445,20 @@ export class TaskDetailPageComponent implements OnInit {
     this.loadTask();
   }
 
-  protected complete(): void {
+  protected submitAction(action: 'complete' | 'approve' | 'observe' | 'reject'): void {
     if (this.completing()) return;
     this.completing.set(true);
     this.completeError.set('');
 
-    const variables: Record<string, unknown> = { ...this.values };
+    const formData: Record<string, unknown> = { ...this.values };
+    const request = {
+      complete: () => this.tasksApi.completeTask(this.taskId, formData, this.comment),
+      approve: () => this.tasksApi.approveTask(this.taskId, formData, this.comment),
+      observe: () => this.tasksApi.observeTask(this.taskId, formData, this.comment),
+      reject: () => this.tasksApi.rejectTask(this.taskId, formData, this.comment)
+    }[action]();
 
-    this.tasksApi.completeTask(this.taskId, variables).pipe(
+    request.pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: () => {
@@ -440,6 +469,20 @@ export class TaskDetailPageComponent implements OnInit {
         this.completing.set(false);
       }
     });
+  }
+
+  protected taskName(): string {
+    const task = this.task();
+    return task?.name ?? task?.taskName ?? task?.taskDefinitionKey ?? 'Tarea';
+  }
+
+  protected departmentLabel(): string {
+    const task = this.task();
+    return task?.responsibleDepartmentName
+      ?? task?.departmentName
+      ?? task?.responsibleDepartmentCode
+      ?? task?.departmentCode
+      ?? '';
   }
 
   protected isSpecialType(field: FormField): boolean {

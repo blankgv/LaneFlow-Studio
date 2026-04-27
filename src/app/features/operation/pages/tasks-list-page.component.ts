@@ -68,19 +68,20 @@ type Tab = 'available' | 'mine';
 
         <div class="tasks-empty" *ngIf="available().length === 0">
           <mat-icon>inbox</mat-icon>
-          <span>No hay tareas disponibles en este momento.</span>
+          <strong>No hay tareas disponibles</strong>
+          <span>Las tareas apareceran aqui cuando exista un tramite iniciado y una tarea pendiente para tu departamento.</span>
         </div>
 
         <div class="task-card" *ngFor="let task of available()">
           <div class="task-card__body">
             <div class="task-card__main">
-              <span class="task-card__name">{{ task.taskName }}</span>
+              <span class="task-card__name">{{ taskName(task) }}</span>
               <span class="task-card__workflow">{{ task.workflowName }}</span>
             </div>
             <div class="task-card__meta">
-              <span class="task-meta-chip" *ngIf="task.departmentName || task.departmentCode">
+              <span class="task-meta-chip" *ngIf="departmentLabel(task)">
                 <mat-icon>corporate_fare</mat-icon>
-                {{ task.departmentName || task.departmentCode }}
+                {{ departmentLabel(task) }}
               </span>
               <span class="task-meta-chip">
                 <mat-icon>schedule</mat-icon>
@@ -96,11 +97,11 @@ type Tab = 'available' | 'mine';
             <button
               mat-flat-button
               color="primary"
-              [disabled]="claiming() === task.taskId"
+              [disabled]="claiming() === taskId(task)"
               (click)="claim(task)"
             >
               <mat-icon>pan_tool</mat-icon>
-              {{ claiming() === task.taskId ? 'Asignando...' : 'Tomar tarea' }}
+              {{ claiming() === taskId(task) ? 'Asignando...' : 'Tomar tarea' }}
             </button>
           </div>
         </div>
@@ -111,19 +112,20 @@ type Tab = 'available' | 'mine';
 
         <div class="tasks-empty" *ngIf="mine().length === 0">
           <mat-icon>assignment_ind</mat-icon>
-          <span>No tienes tareas asignadas.</span>
+          <strong>No tienes tareas asignadas</strong>
+          <span>Toma una tarea disponible para verla en esta bandeja.</span>
         </div>
 
         <div class="task-card" *ngFor="let task of mine()">
           <div class="task-card__body">
             <div class="task-card__main">
-              <span class="task-card__name">{{ task.taskName }}</span>
+              <span class="task-card__name">{{ taskName(task) }}</span>
               <span class="task-card__workflow">{{ task.workflowName }}</span>
             </div>
             <div class="task-card__meta">
-              <span class="task-meta-chip" *ngIf="task.departmentName || task.departmentCode">
+              <span class="task-meta-chip" *ngIf="departmentLabel(task)">
                 <mat-icon>corporate_fare</mat-icon>
-                {{ task.departmentName || task.departmentCode }}
+                {{ departmentLabel(task) }}
               </span>
               <span class="task-meta-chip">
                 <mat-icon>schedule</mat-icon>
@@ -255,6 +257,12 @@ type Tab = 'available' | 'mine';
       padding: 48px 0;
       color: var(--text-muted);
       font-size: 0.86rem;
+      text-align: center;
+    }
+
+    .tasks-empty strong {
+      color: var(--text);
+      font-size: 0.95rem;
     }
 
     .tasks-empty mat-icon {
@@ -369,13 +377,14 @@ export class TasksListPageComponent implements OnInit {
   }
 
   protected claim(task: TaskInstance): void {
-    this.claiming.set(task.taskId);
-    this.tasksApi.claimTask(task.taskId).pipe(
+    const id = this.taskId(task);
+    this.claiming.set(id);
+    this.tasksApi.claimTask(id).pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: (claimed) => {
         this.claiming.set(null);
-        this.available.update((list) => list.filter((t) => t.taskId !== task.taskId));
+        this.available.update((list) => list.filter((t) => this.taskId(t) !== id));
         this.mine.update((list) => [claimed, ...list]);
         this.activeTab.set('mine');
       },
@@ -386,7 +395,23 @@ export class TasksListPageComponent implements OnInit {
   }
 
   protected openTask(task: TaskInstance): void {
-    void this.router.navigate(['/operation/tasks', task.taskId]);
+    void this.router.navigate(['/operation/tasks', this.taskId(task)]);
+  }
+
+  protected taskId(task: TaskInstance): string {
+    return task.id ?? task.taskId ?? '';
+  }
+
+  protected taskName(task: TaskInstance): string {
+    return task.name ?? task.taskName ?? task.taskDefinitionKey ?? 'Tarea';
+  }
+
+  protected departmentLabel(task: TaskInstance): string {
+    return task.responsibleDepartmentName
+      ?? task.departmentName
+      ?? task.responsibleDepartmentCode
+      ?? task.departmentCode
+      ?? '';
   }
 
   private loadAll(): void {

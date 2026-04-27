@@ -8,9 +8,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { forkJoin, of, switchMap } from 'rxjs';
 
 import { FormField } from '../../design/models/dynamic-form.model';
+import { Evidence, EvidenceCategory, PendingEvidence } from '../models/evidence.model';
 import { TaskInstance } from '../models/task-instance.model';
+import { EvidencesApiService } from '../services/evidences-api.service';
 import { TasksApiService } from '../services/tasks-api.service';
 
 @Component({
@@ -54,6 +57,39 @@ import { TasksApiService } from '../services/tasks-api.service';
         </button>
       </div>
 
+      <section class="task-form" *ngIf="!task()?.form && procedureEvidences().length > 0">
+        <div class="task-form__title">
+          <mat-icon>attach_file</mat-icon>
+          Evidencias del tramite
+        </div>
+        <div class="evidence-groups">
+          <div>
+            <h3>Generales</h3>
+            <article class="evidence-card" *ngFor="let evidence of generalEvidences()">
+              <mat-icon>attach_file</mat-icon>
+              <div>
+                <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                <span>{{ evidence.description || categoryLabel(evidence.category) }}</span>
+              </div>
+              <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
+            </article>
+            <p class="empty-evidence" *ngIf="generalEvidences().length === 0">Sin evidencia general.</p>
+          </div>
+          <div>
+            <h3>Desde tareas</h3>
+            <article class="evidence-card" *ngFor="let evidence of taskEvidences()">
+              <mat-icon>assignment</mat-icon>
+              <div>
+                <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                <span>{{ evidence.fieldName || evidence.nodeId || 'Tarea' }} · {{ evidence.description || categoryLabel(evidence.category) }}</span>
+              </div>
+              <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
+            </article>
+            <p class="empty-evidence" *ngIf="taskEvidences().length === 0">Sin evidencia desde tareas.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- Formulario dinámico -->
       <form class="task-form" (ngSubmit)="submitAction('complete')" *ngIf="task()?.form">
         <div class="task-form__title">
@@ -67,6 +103,7 @@ import { TasksApiService } from '../services/tasks-api.service';
             <label class="form-field__label">
               {{ field.label }}
               <span class="form-field__required" *ngIf="field.required">*</span>
+              <span class="inherited-chip" *ngIf="hasInheritedValue(field)">Valor heredado</span>
             </label>
 
             <textarea
@@ -113,7 +150,7 @@ import { TasksApiService } from '../services/tasks-api.service';
             </label>
 
             <input
-              *ngIf="!isSpecialType(field)"
+              *ngIf="!isSpecialType(field) && !isFileType(field)"
               class="form-field__input"
               [type]="inputType(field)"
               [required]="field.required"
@@ -121,8 +158,72 @@ import { TasksApiService } from '../services/tasks-api.service';
               [name]="field.name"
             />
 
+            <div class="field-evidence" *ngIf="isFileType(field)">
+              <input
+                class="form-field__input"
+                type="file"
+                [required]="field.required"
+                (change)="setTaskEvidenceFile(field.name, $event)"
+              />
+              <input
+                class="form-field__input"
+                placeholder="Descripcion del adjunto"
+                [(ngModel)]="taskEvidenceUploads[field.name].description"
+                [name]="field.name + '_description'"
+              />
+              <select
+                class="form-field__input form-field__select"
+                [(ngModel)]="taskEvidenceUploads[field.name].category"
+                [name]="field.name + '_category'"
+              >
+                <option *ngFor="let category of evidenceCategories" [ngValue]="category">
+                  {{ categoryLabel(category) }}
+                </option>
+              </select>
+            </div>
+
           </div>
         </div>
+
+        <section class="context-panel" *ngIf="formDataEntries().length > 0">
+          <h2>Datos acumulados del tramite</h2>
+          <dl class="data-list">
+            <div *ngFor="let item of formDataEntries()">
+              <dt>{{ item.key }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="evidence-panel" *ngIf="procedureEvidences().length > 0">
+          <h2>Evidencias del tramite</h2>
+          <div class="evidence-groups">
+            <div>
+              <h3>Generales</h3>
+              <article class="evidence-card" *ngFor="let evidence of generalEvidences()">
+                <mat-icon>attach_file</mat-icon>
+                <div>
+                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                  <span>{{ evidence.description || categoryLabel(evidence.category) }}</span>
+                </div>
+                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
+              </article>
+              <p class="empty-evidence" *ngIf="generalEvidences().length === 0">Sin evidencia general.</p>
+            </div>
+            <div>
+              <h3>Desde tareas</h3>
+              <article class="evidence-card" *ngFor="let evidence of taskEvidences()">
+                <mat-icon>assignment</mat-icon>
+                <div>
+                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                  <span>{{ evidence.fieldName || evidence.nodeId || 'Tarea' }} · {{ evidence.description || categoryLabel(evidence.category) }}</span>
+                </div>
+                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
+              </article>
+              <p class="empty-evidence" *ngIf="taskEvidences().length === 0">Sin evidencia desde tareas.</p>
+            </div>
+          </div>
+        </section>
 
         <div class="form-field">
           <label class="form-field__label">Comentario</label>
@@ -346,6 +447,18 @@ import { TasksApiService } from '../services/tasks-api.service';
       margin-left: 2px;
     }
 
+    .inherited-chip {
+      display: inline-flex;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 0.68rem;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+
     .form-field__input {
       width: 100%;
       box-sizing: border-box;
@@ -389,6 +502,104 @@ import { TasksApiService } from '../services/tasks-api.service';
       margin: 0;
     }
 
+    .field-evidence {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 170px;
+      gap: 8px;
+    }
+
+    .evidence-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+    }
+
+    .context-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+    }
+
+    .evidence-panel h2,
+    .context-panel h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.96rem;
+    }
+
+    .data-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .data-list div {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+    }
+
+    .data-list dt {
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .data-list dd {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.82rem;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-groups {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .evidence-groups h3 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font-size: 0.84rem;
+    }
+
+    .evidence-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      margin-bottom: 8px;
+    }
+
+    .evidence-card > mat-icon {
+      color: var(--accent-strong);
+    }
+
+    .evidence-card div {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .evidence-card span,
+    .empty-evidence {
+      color: var(--text-muted);
+      font-size: 0.74rem;
+    }
+
     .task-form__actions {
       display: flex;
       gap: 10px;
@@ -426,14 +637,25 @@ export class TaskDetailPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly tasksApi = inject(TasksApiService);
+  private readonly evidencesApi = inject(EvidencesApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly task = signal<TaskInstance | null>(null);
+  protected readonly procedureEvidences = signal<Evidence[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal('');
   protected readonly completing = signal(false);
   protected readonly completeError = signal('');
   protected comment = '';
+  protected readonly evidenceCategories: EvidenceCategory[] = [
+    'GENERAL',
+    'IDENTITY_DOCUMENT',
+    'SUPPORT_DOCUMENT',
+    'PAYMENT_RECEIPT',
+    'PHOTO',
+    'OTHER'
+  ];
+  protected taskEvidenceUploads: Record<string, PendingEvidence> = {};
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected values: Record<string, any> = {};
@@ -450,22 +672,31 @@ export class TaskDetailPageComponent implements OnInit {
     this.completing.set(true);
     this.completeError.set('');
 
+    if (!this.validateRequiredEvidence()) {
+      this.completing.set(false);
+      return;
+    }
+
+    const currentTask = this.task();
     const formData: Record<string, unknown> = { ...this.values };
-    const request = {
+    const uploads = this.buildTaskEvidenceUploads(currentTask);
+    const uploadRequest = uploads.length > 0 ? forkJoin(uploads) : of([]);
+    const actionRequest = {
       complete: () => this.tasksApi.completeTask(this.taskId, formData, this.comment),
       approve: () => this.tasksApi.approveTask(this.taskId, formData, this.comment),
       observe: () => this.tasksApi.observeTask(this.taskId, formData, this.comment),
       reject: () => this.tasksApi.rejectTask(this.taskId, formData, this.comment)
-    }[action]();
+    }[action];
 
-    request.pipe(
+    uploadRequest.pipe(
+      switchMap(() => actionRequest()),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: () => {
         void this.router.navigate(['/operation/tasks']);
       },
       error: (err: HttpErrorResponse) => {
-        this.completeError.set(err.error?.message || 'No fue posible completar la tarea.');
+        this.completeError.set(err.error?.message || 'No fue posible subir evidencias o completar la tarea.');
         this.completing.set(false);
       }
     });
@@ -487,6 +718,10 @@ export class TaskDetailPageComponent implements OnInit {
 
   protected isSpecialType(field: FormField): boolean {
     return ['TEXTAREA', 'SELECT', 'RADIO', 'MULTISELECT', 'CHECKBOX'].includes(field.type);
+  }
+
+  protected isFileType(field: FormField): boolean {
+    return ['FILE', 'IMAGE', 'PHOTO', 'AUDIO', 'VIDEO', 'DOCUMENT'].includes(field.type);
   }
 
   protected inputType(field: FormField): string {
@@ -512,6 +747,49 @@ export class TaskDetailPageComponent implements OnInit {
     }
   }
 
+  protected hasInheritedValue(field: FormField): boolean {
+    if (this.isFileType(field)) return false;
+    return Object.prototype.hasOwnProperty.call(this.task()?.formData ?? {}, field.name);
+  }
+
+  protected setTaskEvidenceFile(fieldName: string, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    this.ensureTaskEvidenceUpload(fieldName);
+    this.taskEvidenceUploads[fieldName] = {
+      ...this.taskEvidenceUploads[fieldName],
+      file
+    };
+  }
+
+  protected generalEvidences(): Evidence[] {
+    return this.procedureEvidences().filter((evidence) => !evidence.nodeId && !evidence.fieldName);
+  }
+
+  protected taskEvidences(): Evidence[] {
+    return this.procedureEvidences().filter((evidence) => !!evidence.nodeId || !!evidence.fieldName);
+  }
+
+  protected categoryLabel(category: EvidenceCategory | Evidence['category']): string {
+    const labels: Record<string, string> = {
+      GENERAL: 'General',
+      IDENTITY_DOCUMENT: 'Documento de identidad',
+      SUPPORT_DOCUMENT: 'Documento de respaldo',
+      PAYMENT_RECEIPT: 'Comprobante de pago',
+      PHOTO: 'Foto',
+      OTHER: 'Otro'
+    };
+    return category ? labels[category] ?? category : 'Sin descripcion';
+  }
+
+  protected formDataEntries(): Array<{ key: string; value: string }> {
+    const data = this.task()?.formData ?? {};
+    return Object.entries(data).map(([key, value]) => ({
+      key,
+      value: this.formatValue(value)
+    }));
+  }
+
   private loadTask(): void {
     this.tasksApi.getTask(this.taskId).pipe(
       takeUntilDestroyed(this.destroyRef)
@@ -519,6 +797,7 @@ export class TaskDetailPageComponent implements OnInit {
       next: (task) => {
         this.task.set(task);
         this.initValues(task);
+        this.loadEvidences(task);
         this.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {
@@ -530,9 +809,70 @@ export class TaskDetailPageComponent implements OnInit {
 
   private initValues(task: TaskInstance): void {
     this.values = {};
+    this.taskEvidenceUploads = {};
+    const savedData = task.formData ?? {};
     task.form?.fields.forEach((f) => {
-      this.values[f.name] = f.type === 'MULTISELECT' ? [] :
-                             f.type === 'CHECKBOX'   ? false : '';
+      if (this.isFileType(f)) {
+        this.ensureTaskEvidenceUpload(f.name);
+        return;
+      }
+      const inherited = savedData[f.name];
+      this.values[f.name] = inherited ?? (
+        f.type === 'MULTISELECT' ? [] :
+        f.type === 'CHECKBOX' ? false : ''
+      );
     });
+  }
+
+  private ensureTaskEvidenceUpload(fieldName: string): void {
+    this.taskEvidenceUploads[fieldName] ??= { file: null, description: '', category: 'GENERAL' };
+  }
+
+  private validateRequiredEvidence(): boolean {
+    const missing = this.task()?.form?.fields.some((field) =>
+      this.isFileType(field) && field.required && !this.taskEvidenceUploads[field.name]?.file
+    );
+    if (missing) {
+      this.completeError.set('Adjunta los archivos obligatorios antes de continuar.');
+      return false;
+    }
+    return true;
+  }
+
+  private buildTaskEvidenceUploads(task: TaskInstance | null) {
+    if (!task?.procedureId) return [];
+
+    return Object.entries(this.taskEvidenceUploads)
+      .filter(([, upload]) => upload.file)
+      .map(([fieldName, upload]) => this.evidencesApi.uploadTaskEvidence({
+        procedureId: task.procedureId!,
+        taskId: this.taskId,
+        nodeId: task.taskDefinitionKey ?? task.id ?? task.taskId,
+        fieldName,
+        file: upload.file!,
+        description: upload.description,
+        category: upload.category
+      }));
+  }
+
+  private loadEvidences(task: TaskInstance): void {
+    if (!task.procedureId) {
+      this.procedureEvidences.set([]);
+      return;
+    }
+
+    this.evidencesApi.getProcedureEvidences(task.procedureId).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: (evidences) => this.procedureEvidences.set(evidences),
+      error: () => this.procedureEvidences.set([])
+    });
+  }
+
+  private formatValue(value: unknown): string {
+    if (value === null || value === undefined || value === '') return '-';
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
   }
 }

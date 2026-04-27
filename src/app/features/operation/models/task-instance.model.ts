@@ -25,5 +25,6 @@ export interface TaskInstance {
   claimedAt?: string | null;
   createdAt?: string;
   dueDate?: string | null;
+  formData?: Record<string, unknown> | null;
   form: DynamicForm | null;
 }

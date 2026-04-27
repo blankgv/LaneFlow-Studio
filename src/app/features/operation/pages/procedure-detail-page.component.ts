@@ -13,6 +13,8 @@ import {
   ProcedureStatus,
   ProcedureStatusInfo
 } from '../models/procedure.model';
+import { Evidence } from '../models/evidence.model';
+import { EvidencesApiService } from '../services/evidences-api.service';
 import { ProceduresApiService } from '../services/procedures-api.service';
 
 @Component({
@@ -141,6 +143,47 @@ import { ProceduresApiService } from '../services/procedures-api.service';
             </dl>
           </section>
         </div>
+
+        <section class="panel">
+          <h2>Evidencias</h2>
+          <div class="evidence-groups">
+            <div>
+              <h3>Evidencia general</h3>
+              <div class="empty-inline" *ngIf="generalEvidences().length === 0">
+                No hay evidencia general.
+              </div>
+              <article class="evidence-card" *ngFor="let evidence of generalEvidences()">
+                <mat-icon>attach_file</mat-icon>
+                <div>
+                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                  <span>{{ evidence.description || categoryLabel(evidence.category) }}</span>
+                  <small>{{ evidence.uploadedBy || '-' }} · {{ evidence.createdAt | date:'dd/MM/yyyy HH:mm' }}</small>
+                </div>
+                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">
+                  Abrir
+                </a>
+              </article>
+            </div>
+
+            <div>
+              <h3>Evidencia desde tareas</h3>
+              <div class="empty-inline" *ngIf="taskEvidences().length === 0">
+                No hay evidencia subida desde tareas.
+              </div>
+              <article class="evidence-card" *ngFor="let evidence of taskEvidences()">
+                <mat-icon>assignment</mat-icon>
+                <div>
+                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                  <span>{{ evidence.fieldName || evidence.nodeId || 'Tarea' }} · {{ evidence.description || categoryLabel(evidence.category) }}</span>
+                  <small>{{ evidence.uploadedBy || '-' }} · {{ evidence.createdAt | date:'dd/MM/yyyy HH:mm' }}</small>
+                </div>
+                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">
+                  Abrir
+                </a>
+              </article>
+            </div>
+          </div>
+        </section>
 
         <section class="panel">
           <h2>Historial</h2>
@@ -360,6 +403,47 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       font-size: 0.74rem;
     }
 
+    .evidence-groups {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .evidence-groups h3 {
+      margin: 0 0 10px;
+      color: var(--text);
+      font-size: 0.86rem;
+    }
+
+    .evidence-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      margin-bottom: 8px;
+    }
+
+    .evidence-card > mat-icon {
+      color: var(--accent-strong);
+    }
+
+    .evidence-card div {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .evidence-card span,
+    .evidence-card small {
+      color: var(--text-muted);
+      font-size: 0.74rem;
+    }
+
     .status-chip {
       margin-left: auto;
       display: inline-flex;
@@ -417,7 +501,8 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 
     @media (max-width: 900px) {
       .summary-grid,
-      .detail-grid {
+      .detail-grid,
+      .evidence-groups {
         grid-template-columns: 1fr;
       }
     }
@@ -426,11 +511,13 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 export class ProcedureDetailPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly proceduresApi = inject(ProceduresApiService);
+  private readonly evidencesApi = inject(EvidencesApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly procedure = signal<ProcedureInstance | null>(null);
   protected readonly status = signal<ProcedureStatusInfo | null>(null);
   protected readonly history = signal<ProcedureHistory | null>(null);
+  protected readonly evidences = signal<Evidence[]>([]);
   protected readonly loading = signal(true);
   protected readonly resolving = signal(false);
   protected readonly error = signal('');
@@ -476,6 +563,14 @@ export class ProcedureDetailPageComponent implements OnInit {
     }));
   }
 
+  protected generalEvidences(): Evidence[] {
+    return this.evidences().filter((evidence) => !evidence.nodeId && !evidence.fieldName);
+  }
+
+  protected taskEvidences(): Evidence[] {
+    return this.evidences().filter((evidence) => !!evidence.nodeId || !!evidence.fieldName);
+  }
+
   protected statusLabel(status: ProcedureStatus): string {
     const labels: Record<ProcedureStatus, string> = {
       STARTED: 'Iniciado',
@@ -508,6 +603,18 @@ export class ProcedureDetailPageComponent implements OnInit {
     return messages[status] ?? '';
   }
 
+  protected categoryLabel(category: Evidence['category']): string {
+    const labels: Record<string, string> = {
+      GENERAL: 'General',
+      IDENTITY_DOCUMENT: 'Documento de identidad',
+      SUPPORT_DOCUMENT: 'Documento de respaldo',
+      PAYMENT_RECEIPT: 'Comprobante de pago',
+      PHOTO: 'Foto',
+      OTHER: 'Otro'
+    };
+    return category ? labels[category] ?? category : 'Sin descripcion';
+  }
+
   private loadDetail(): void {
     if (!this.procedureId) {
       this.error.set('Identificador de tramite invalido.');
@@ -525,6 +632,7 @@ export class ProcedureDetailPageComponent implements OnInit {
         this.procedure.set(procedure);
         this.loading.set(false);
         this.loadTracking();
+        this.loadEvidences();
       },
       error: (err: HttpErrorResponse) => {
         this.error.set(err.error?.message || 'No fue posible cargar el tramite.');
@@ -546,6 +654,15 @@ export class ProcedureDetailPageComponent implements OnInit {
     ).subscribe({
       next: (history) => this.history.set(history),
       error: () => this.history.set(null)
+    });
+  }
+
+  private loadEvidences(): void {
+    this.evidencesApi.getProcedureEvidences(this.procedureId).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: (evidences) => this.evidences.set(evidences),
+      error: () => this.evidences.set([])
     });
   }
 

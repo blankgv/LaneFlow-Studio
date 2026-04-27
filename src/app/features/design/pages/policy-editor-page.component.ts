@@ -6,12 +6,16 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 import { ApiError } from '../../../core/models/api-error.model';
+import { DepartmentOption } from '../../admin/models/department-option.model';
+import { AdminDepartmentsService } from '../../admin/services/admin-departments.service';
 import { AuthSessionService } from '../../auth/services/auth-session.service';
-import { BpmnEditorComponent, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
+import { AssignDepartmentDialogComponent } from '../components/assign-department-dialog/assign-department-dialog.component';
+import { BpmnEditorComponent, BpmnValidationSummary, LaneAddedEvent, LaneInsertRequest, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
 import { FormPanelComponent } from '../components/form-panel/form-panel.component';
 import { PresenceIndicatorComponent } from '../components/presence-indicator/presence-indicator.component';
 import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
@@ -107,6 +111,11 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
             [readonly]="!snapshot()?.canEdit"
             (xmlChange)="onXmlChange($event)"
             (flowSelected)="onFlowSelected($event)"
+            (laneAdded)="onLaneAdded($event)"
+            (laneInsertRequested)="onLaneInsertRequested($event)"
+            (poolCreated)="onPoolCreated($event)"
+            (multiplePoolsBlocked)="onMultiplePoolsBlocked()"
+            (taskOutsideLane)="onTaskOutsideLane()"
           />
         </div>
 
@@ -720,6 +729,8 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   private readonly workflowApi = inject(WorkflowApiService);
   private readonly collaborationService = inject(WorkflowCollaborationService);
   private readonly authSession = inject(AuthSessionService);
+  private readonly departmentsService = inject(AdminDepartmentsService);
+  private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(true);
@@ -845,6 +856,12 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
     }
 
     // Pre-validación en cliente
+    const structureError = this.validateBpmnStructure(snap);
+    if (structureError) {
+      this.publishError.set(structureError);
+      return;
+    }
+
     const tasksWithoutLane = snap.tasks.filter((t) => !t.swimlaneId);
     if (tasksWithoutLane.length > 0) {
       const names = tasksWithoutLane.map((t) => t.nodeName || t.nodeId).join(', ');
@@ -876,6 +893,33 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
         this.publishError.set(apiError?.message || 'La politica no paso la validacion.');
         this.publishing.set(false);
       }
+    });
+  }
+
+  private getPreparedBpmnXml(): Promise<string> {
+    return this.bpmnEditor?.prepareXmlForPersistence() ?? Promise.resolve(this.currentXml());
+  }
+
+  private invalidCamundaProcessKey(value: string | null | undefined): string | null {
+    if (!value) return null;
+    return /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(value) ? null : value;
+  }
+
+  private pickDepartment(): Promise<DepartmentOption | null> {
+    return new Promise((resolve) => {
+      this.departmentsService.getDepartments().subscribe({
+        next: (departments) => {
+          const ref = this.dialog.open(AssignDepartmentDialogComponent, {
+            width: '480px',
+            data: { departments: departments.filter((item) => item.active !== false) }
+          });
+          ref.afterClosed().subscribe((department: DepartmentOption | null | undefined) => resolve(department ?? null));
+        },
+        error: () => {
+          this.publishError.set('No fue posible cargar los departamentos.');
+          resolve(null);
+        }
+      });
     });
   }
 
@@ -938,6 +982,43 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   protected onFlowSelected(flow: SelectedFlowElement | null): void {
     this.selectedFlow.set(flow);
     this.conditionDraft.set(flow?.condition ?? '');
+  }
+
+  protected onPoolCreated(poolId: string): void {
+    const policyName = this.snapshot()?.workflow.name ?? '';
+    this.bpmnEditor?.setElementName(poolId, policyName);
+    void this.pickDepartment().then((department) => {
+      if (!department) {
+        this.bpmnEditor?.removeElement(poolId);
+        return;
+      }
+      this.bpmnEditor?.addLaneToPool(poolId, department.code);
+      this.save();
+    });
+  }
+
+  protected onLaneInsertRequested(request: LaneInsertRequest): void {
+    void this.pickDepartment().then((department) => {
+      if (!department) return;
+      this.bpmnEditor?.addLaneNear(request.targetElementId, request.location, department.code);
+      this.save();
+    });
+  }
+
+  protected onLaneAdded(event: LaneAddedEvent): void {
+    void this.pickDepartment().then((department) => {
+      if (!department) return;
+      this.bpmnEditor?.setElementName(event.elementId, department.code);
+      this.save();
+    });
+  }
+
+  protected onMultiplePoolsBlocked(): void {
+    this.publishError.set('Solo se permite un pool por politica.');
+  }
+
+  protected onTaskOutsideLane(): void {
+    this.publishError.set('Todas las tareas deben estar dentro de una lane/departamento.');
   }
 
   protected applyCondition(): void {

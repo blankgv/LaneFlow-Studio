@@ -21,6 +21,26 @@ export interface SelectedFlowElement {
   name: string;
 }
 
+export interface LaneAddedEvent {
+  elementId: string;
+  elementType: 'lane';
+}
+
+export interface LaneInsertRequest {
+  targetElementId: string;
+  location: 'top' | 'bottom';
+}
+
+export interface BpmnValidationSummary {
+  pools: number;
+  lanes: Array<{ id: string; name: string }>;
+  tasksOutsideLane: number;
+}
+
+const LANE_HEIGHT = 250;
+const LANE_INDENTATION = 30;
+const POOL_MIN_WIDTH = 750;
+
 @Component({
   selector: 'app-bpmn-editor',
   standalone: true,
@@ -38,6 +58,11 @@ export interface SelectedFlowElement {
       height: 100%;
       background: #fff;
     }
+
+    :host ::ng-deep .djs-context-pad .entry.bpmn-icon-lane-divide-two,
+    :host ::ng-deep .djs-context-pad .entry.bpmn-icon-lane-divide-three {
+      display: none !important;
+    }
   `]
 })
 export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy {
@@ -45,6 +70,11 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() readonly = false;
   @Output() readonly xmlChange = new EventEmitter<string>();
   @Output() readonly flowSelected = new EventEmitter<SelectedFlowElement | null>();
+  @Output() readonly laneAdded = new EventEmitter<LaneAddedEvent>();
+  @Output() readonly poolCreated = new EventEmitter<string>();
+  @Output() readonly laneInsertRequested = new EventEmitter<LaneInsertRequest>();
+  @Output() readonly multiplePoolsBlocked = new EventEmitter<void>();
+  @Output() readonly taskOutsideLane = new EventEmitter<{ elementId: string }>();
 
   @ViewChild('canvas') private readonly canvasRef!: ElementRef<HTMLDivElement>;
 
@@ -54,6 +84,8 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private initialized = false;
   private lastImportedXml = '';
   private suppressNextEmit = false;
+  private suppressLaneEmit = false;
+  private readonly recentlyEmittedLaneIds = new Set<string>();
 
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
@@ -78,6 +110,8 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
             }
           });
         });
+
+        this.registerLaneContextPadOverrides();
 
         // ── Creación de shapes ──────────────────────────────────────────────
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -378,10 +412,19 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tasksOutsideLane: number = elementRegistry
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((el: any) => taskTypes.includes(el.type) && el.parent?.type !== 'bpmn:Lane')
+      .filter((el: any) => taskTypes.includes(el.type) && !this.isElementInsideAnyLane(el))
       .length;
 
     return { pools, lanes, tasksOutsideLane };
+  }
+
+  prepareXmlForPersistence(): Promise<string> {
+    if (!this.initialized) return Promise.resolve(this.xml);
+    this.sanitizeModelIdsForCamunda();
+    const assignments = this.getLaneTaskAssignments();
+    return this.modeler.saveXML({ format: true }).then(({ xml }: { xml: string }) =>
+      this.sanitizeXmlForCamunda(this.applyLaneTaskAssignments(xml ?? this.xml, assignments))
+    );
   }
 
   // ── Privado ───────────────────────────────────────────────────────────────
@@ -479,6 +522,114 @@ export class BpmnEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     }, 250);
 
     this.zone.run(() => this.laneAdded.emit({ elementId, elementType: 'lane' }));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private isElementInsideAnyLane(element: any): boolean {
+    const elementRegistry = this.modeler.get('elementRegistry');
+    const centerX = element.x + element.width / 2;
+    const centerY = element.y + element.height / 2;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return elementRegistry.filter((el: any) => el.type === 'bpmn:Lane').some((lane: any) =>
+      centerX >= lane.x &&
+      centerX <= lane.x + lane.width &&
+      centerY >= lane.y &&
+      centerY <= lane.y + lane.height
+    );
+  }
+
+  private getLaneTaskAssignments(): Array<{ laneId: string; taskIds: string[] }> {
+    const elementRegistry = this.modeler.get('elementRegistry');
+    const taskTypes = ['bpmn:Task', 'bpmn:UserTask', 'bpmn:ServiceTask',
+                       'bpmn:ManualTask', 'bpmn:SendTask', 'bpmn:ReceiveTask'];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lanes: any[] = elementRegistry.filter((el: any) => el.type === 'bpmn:Lane');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tasks: any[] = elementRegistry.filter((el: any) => taskTypes.includes(el.type));
+    return lanes.map((lane) => ({
+      laneId: lane.id,
+      taskIds: tasks.filter((task) => this.isElementInsideLane(task, lane)).map((task) => task.id)
+    }));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private isElementInsideLane(element: any, lane: any): boolean {
+    const centerX = element.x + element.width / 2;
+    const centerY = element.y + element.height / 2;
+    return centerX >= lane.x &&
+      centerX <= lane.x + lane.width &&
+      centerY >= lane.y &&
+      centerY <= lane.y + lane.height;
+  }
+
+  private applyLaneTaskAssignments(xml: string, assignments: Array<{ laneId: string; taskIds: string[] }>): string {
+    if (!xml || typeof DOMParser === 'undefined') return xml;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length > 0) return xml;
+
+    assignments.forEach(({ laneId, taskIds }) => {
+      const lane = doc.querySelector(`[id="${laneId}"]`);
+      if (!lane) return;
+      Array.from(lane.getElementsByTagNameNS('*', 'flowNodeRef')).forEach((node) => node.remove());
+      taskIds.forEach((taskId) => {
+        const ref = doc.createElementNS('http://www.omg.org/spec/BPMN/20100524/MODEL', 'bpmn:flowNodeRef');
+        ref.textContent = taskId;
+        lane.appendChild(ref);
+      });
+    });
+
+    return new XMLSerializer().serializeToString(doc);
+  }
+
+  private sanitizeXmlForCamunda(xml: string): string {
+    return xml.replace(/\b(id|processRef|bpmnElement)="([^"]+)"/g, (_match, attr: string, value: string) =>
+      `${attr}="${this.safeBpmnId(value)}"`
+    );
+  }
+
+  private sanitizeModelIdsForCamunda(): void {
+    const definitions = this.modeler.getDefinitions?.();
+    if (!definitions) return;
+    const seen = new Set<string>();
+    this.walkModdle(definitions, (node) => {
+      if (typeof node.id === 'string') {
+        node.id = this.uniqueBpmnId(this.safeBpmnId(node.id), seen);
+      }
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private walkModdle(node: any, visit: (node: any) => void, seen = new Set<any>()): void {
+    if (!node || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
+    visit(node);
+    Object.keys(node).forEach((key) => {
+      if (key.startsWith('$')) return;
+      const value = node[key];
+      if (Array.isArray(value)) value.forEach((item) => this.walkModdle(item, visit, seen));
+      else if (value && typeof value === 'object') this.walkModdle(value, visit, seen);
+    });
+  }
+
+  private safeBpmnId(value: string): string {
+    const normalized = value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Za-z0-9_.-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return /^[A-Za-z_]/.test(normalized) ? normalized : `id_${normalized || 'element'}`;
+  }
+
+  private uniqueBpmnId(value: string, seen: Set<string>): string {
+    let candidate = value;
+    let index = 1;
+    while (seen.has(candidate)) {
+      candidate = `${value}_${index++}`;
+    }
+    seen.add(candidate);
+    return candidate;
   }
 
   private importXml(xml: string): Promise<void> {

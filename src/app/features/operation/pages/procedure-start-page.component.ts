@@ -4,13 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
+import { forkJoin, of, switchMap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 
 import { WorkflowSummary } from '../../design/models/workflow-summary.model';
 import { WorkflowApiService } from '../../design/services/workflow-api.service';
 import { Applicant } from '../models/applicant.model';
+import { EvidenceCategory, PendingEvidence } from '../models/evidence.model';
 import { ApplicantsApiService } from '../services/applicants-api.service';
+import { EvidencesApiService } from '../services/evidences-api.service';
 import { ProceduresApiService } from '../services/procedures-api.service';
 
 @Component({
@@ -70,6 +73,59 @@ import { ProceduresApiService } from '../services/procedures-api.service';
             </select>
           </label>
 
+          <!-- Evidencias opcionales -->
+          <div class="evidence-section">
+            <div class="evidence-section__header">
+              <div>
+                <span class="field__label">Documentacion inicial</span>
+                <span class="optional-badge">Opcional</span>
+              </div>
+              <p class="evidence-section__hint">Adjunta documentos que el tramite requiera desde el inicio.</p>
+            </div>
+
+            <div class="evidence-list">
+              <div class="evidence-item" *ngFor="let ev of pendingEvidences; let i = index">
+                <div class="evidence-item__file">
+                  <label class="file-pick" [class.has-file]="ev.file">
+                    <mat-icon>{{ ev.file ? 'attach_file' : 'upload_file' }}</mat-icon>
+                    <span>{{ ev.file ? fileLabel(ev.file) : 'Seleccionar archivo' }}</span>
+                    <input type="file" class="file-input" (change)="setFile(i, $event)" />
+                  </label>
+                </div>
+                <input
+                  class="inp"
+                  type="text"
+                  placeholder="Descripcion (opcional)"
+                  [(ngModel)]="ev.description"
+                  [name]="'desc' + i"
+                />
+                <select class="sel" [(ngModel)]="ev.category" [name]="'cat' + i">
+                  <option *ngFor="let c of evidenceCategories" [ngValue]="c">{{ categoryLabel(c) }}</option>
+                </select>
+                <button
+                  mat-icon-button
+                  type="button"
+                  class="remove-btn"
+                  title="Quitar"
+                  *ngIf="pendingEvidences.length > 1"
+                  (click)="removeEvidence(i)"
+                >
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <button mat-stroked-button type="button" class="add-btn" (click)="addEvidence()">
+              <mat-icon>add</mat-icon>
+              Agregar documento
+            </button>
+
+            <div class="upload-notice" *ngIf="pendingCount() > 0">
+              <mat-icon>cloud_upload</mat-icon>
+              {{ pendingCount() }} archivo(s) se subirán al crear el tramite.
+            </div>
+          </div>
+
           <div class="actions">
             <button
               mat-flat-button
@@ -85,8 +141,8 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 
         <aside class="panel panel--info">
           <mat-icon class="info-icon">info_outline</mat-icon>
-          <p>Las tareas, formularios y flujo del tramite estan definidos en la politica seleccionada.</p>
-          <p>Podras adjuntar evidencias y documentos desde el detalle del tramite una vez creado.</p>
+          <p>Las tareas, formularios y flujo estan definidos en la politica seleccionada.</p>
+          <p>Tambien podras adjuntar evidencias desde el detalle del tramite una vez creado.</p>
           <a mat-stroked-button routerLink="/operation/applicants">
             <mat-icon>people</mat-icon>
             Gestionar solicitantes
@@ -123,7 +179,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 
     .start-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 280px;
+      grid-template-columns: minmax(0, 1fr) 260px;
       gap: 16px;
       align-items: start;
     }
@@ -145,9 +201,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       background: var(--surface-raised, #f8f9fa);
     }
 
-    .info-icon {
-      color: var(--accent);
-    }
+    .info-icon { color: var(--accent); }
 
     .panel--info p {
       margin: 0;
@@ -168,7 +222,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       color: var(--text);
     }
 
-    .field select {
+    .field select, .sel {
       width: 100%;
       box-sizing: border-box;
       border: 1px solid var(--border);
@@ -177,6 +231,128 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       color: var(--text);
       padding: 9px 12px;
       font: inherit;
+      font-size: 0.87rem;
+    }
+
+    .optional-badge {
+      margin-left: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 1px 7px;
+    }
+
+    /* Evidence section */
+    .evidence-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    .evidence-section__header {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .evidence-section__hint {
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .evidence-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .evidence-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr 160px auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+    }
+
+    .file-pick {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      overflow: hidden;
+    }
+
+    .file-pick.has-file { color: var(--accent-strong); }
+
+    .file-pick mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .file-pick span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .inp {
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      padding: 7px 10px;
+      font: inherit;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+
+    .remove-btn {
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    .add-btn {
+      align-self: flex-start;
+    }
+
+    .upload-notice {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 0.81rem;
+      font-weight: 600;
+    }
+
+    .upload-notice mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
     .empty-notice {
@@ -211,6 +387,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 
     @media (max-width: 740px) {
       .start-grid { grid-template-columns: 1fr; }
+      .evidence-item { grid-template-columns: 1fr; }
     }
   `]
 })
@@ -218,6 +395,7 @@ export class ProcedureStartPageComponent implements OnInit {
   private readonly workflowApi = inject(WorkflowApiService);
   private readonly applicantsApi = inject(ApplicantsApiService);
   private readonly proceduresApi = inject(ProceduresApiService);
+  private readonly evidencesApi = inject(EvidencesApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
 
@@ -228,6 +406,11 @@ export class ProcedureStartPageComponent implements OnInit {
 
   protected selectedWorkflowId = '';
   protected selectedApplicantId = '';
+
+  protected readonly evidenceCategories: EvidenceCategory[] = [
+    'GENERAL', 'IDENTITY_DOCUMENT', 'SUPPORT_DOCUMENT', 'PAYMENT_RECEIPT', 'PHOTO', 'OTHER'
+  ];
+  protected pendingEvidences: PendingEvidence[] = [this.emptyEvidence()];
 
   ngOnInit(): void {
     this.loadWorkflows();
@@ -244,6 +427,19 @@ export class ProcedureStartPageComponent implements OnInit {
       applicantId: this.selectedApplicantId,
       formData: {}
     }).pipe(
+      switchMap((procedure) => {
+        const uploads = this.pendingEvidences
+          .filter((e) => e.file)
+          .map((e) => this.evidencesApi.uploadProcedureEvidence({
+            procedureId: procedure.id,
+            file: e.file!,
+            description: e.description,
+            category: e.category
+          }));
+        return uploads.length > 0
+          ? forkJoin(uploads).pipe(switchMap(() => of(procedure)))
+          : of(procedure);
+      }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: (procedure) => {
@@ -256,17 +452,49 @@ export class ProcedureStartPageComponent implements OnInit {
     });
   }
 
-  protected applicantLabel(applicant: Applicant): string {
-    const name = applicant.name
-      ?? applicant.businessName
-      ?? [applicant.firstName, applicant.lastName].filter(Boolean).join(' ');
-    return `${name || 'Solicitante'}${applicant.documentNumber ? ' — ' + applicant.documentNumber : ''}`;
+  protected pendingCount(): number {
+    return this.pendingEvidences.filter((e) => e.file).length;
+  }
+
+  protected addEvidence(): void {
+    this.pendingEvidences = [...this.pendingEvidences, this.emptyEvidence()];
+  }
+
+  protected removeEvidence(index: number): void {
+    this.pendingEvidences = this.pendingEvidences.filter((_, i) => i !== index);
+  }
+
+  protected setFile(index: number, event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    this.pendingEvidences = this.pendingEvidences.map((e, i) =>
+      i === index ? { ...e, file } : e
+    );
+  }
+
+  protected fileLabel(file: File): string {
+    const kb = Math.max(1, Math.round(file.size / 1024));
+    return `${file.name} (${kb} KB)`;
+  }
+
+  protected categoryLabel(cat: EvidenceCategory): string {
+    const labels: Record<EvidenceCategory, string> = {
+      GENERAL: 'General',
+      IDENTITY_DOCUMENT: 'Documento de identidad',
+      SUPPORT_DOCUMENT: 'Documento de respaldo',
+      PAYMENT_RECEIPT: 'Comprobante de pago',
+      PHOTO: 'Foto',
+      OTHER: 'Otro'
+    };
+    return labels[cat];
+  }
+
+  protected applicantLabel(a: Applicant): string {
+    const name = a.name ?? a.businessName ?? [a.firstName, a.lastName].filter(Boolean).join(' ');
+    return `${name || 'Solicitante'}${a.documentNumber ? ' — ' + a.documentNumber : ''}`;
   }
 
   private loadWorkflows(): void {
-    this.workflowApi.getWorkflows().pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe({
+    this.workflowApi.getWorkflows().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (w) => this.publishedWorkflows.set(w.filter((item) => item.status === 'PUBLISHED')),
       error: (err: HttpErrorResponse) =>
         this.error.set(err.error?.message || 'No fue posible cargar las politicas.')
@@ -274,12 +502,14 @@ export class ProcedureStartPageComponent implements OnInit {
   }
 
   private loadApplicants(): void {
-    this.applicantsApi.getApplicants().pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe({
+    this.applicantsApi.getApplicants().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (a) => this.applicants.set(a.filter((item) => item.active !== false)),
       error: (err: HttpErrorResponse) =>
         this.error.set(err.error?.message || 'No fue posible cargar los solicitantes.')
     });
+  }
+
+  private emptyEvidence(): PendingEvidence {
+    return { file: null, description: '', category: 'GENERAL' };
   }
 }

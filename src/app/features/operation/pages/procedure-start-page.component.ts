@@ -85,33 +85,35 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 
             <div class="evidence-list">
               <div class="evidence-item" *ngFor="let ev of pendingEvidences; let i = index">
-                <div class="evidence-item__file">
+                <div class="evidence-item__top">
                   <label class="file-pick" [class.has-file]="ev.file">
                     <mat-icon>{{ ev.file ? 'attach_file' : 'upload_file' }}</mat-icon>
                     <span>{{ ev.file ? fileLabel(ev.file) : 'Seleccionar archivo' }}</span>
                     <input type="file" class="file-input" (change)="setFile(i, $event)" />
                   </label>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="remove-btn"
+                    title="Quitar"
+                    *ngIf="pendingEvidences.length > 1"
+                    (click)="removeEvidence(i)"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
                 </div>
-                <input
-                  class="inp"
-                  type="text"
-                  placeholder="Descripcion (opcional)"
-                  [(ngModel)]="ev.description"
-                  [name]="'desc' + i"
-                />
-                <select class="sel" [(ngModel)]="ev.category" [name]="'cat' + i">
-                  <option *ngFor="let c of evidenceCategories" [ngValue]="c">{{ categoryLabel(c) }}</option>
-                </select>
-                <button
-                  mat-icon-button
-                  type="button"
-                  class="remove-btn"
-                  title="Quitar"
-                  *ngIf="pendingEvidences.length > 1"
-                  (click)="removeEvidence(i)"
-                >
-                  <mat-icon>close</mat-icon>
-                </button>
+                <div class="evidence-item__bottom">
+                  <input
+                    class="inp"
+                    type="text"
+                    placeholder="Descripcion (opcional)"
+                    [(ngModel)]="ev.description"
+                    [name]="'desc' + i"
+                  />
+                  <select class="sel" [(ngModel)]="ev.category" [name]="'cat' + i">
+                    <option *ngFor="let c of evidenceCategories" [ngValue]="c">{{ categoryLabel(c) }}</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -275,17 +277,29 @@ import { ProceduresApiService } from '../services/procedures-api.service';
     }
 
     .evidence-item {
-      display: grid;
-      grid-template-columns: 1fr 1fr 160px auto;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
-      align-items: center;
-      padding: 10px;
+      padding: 10px 12px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: var(--surface-2);
     }
 
+    .evidence-item__top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .evidence-item__bottom {
+      display: grid;
+      grid-template-columns: 1fr 160px;
+      gap: 8px;
+    }
+
     .file-pick {
+      flex: 1;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -293,6 +307,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       font-size: 0.82rem;
       color: var(--text-muted);
       overflow: hidden;
+      min-width: 0;
     }
 
     .file-pick.has-file { color: var(--accent-strong); }
@@ -310,9 +325,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       white-space: nowrap;
     }
 
-    .file-input {
-      display: none;
-    }
+    .file-input { display: none; }
 
     .inp {
       box-sizing: border-box;

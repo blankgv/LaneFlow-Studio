@@ -1,31 +1,32 @@
 import { Injectable } from '@angular/core';
 
 import { AppConfig } from './app-config.model';
-import { GENERATED_RUNTIME_CONFIG } from './generated-runtime-config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AppConfigService {
-  private readonly config: AppConfig = GENERATED_RUNTIME_CONFIG;
+  private config: AppConfig = { apiBaseUrl: '', wsBaseUrl: '' };
 
   load(): Promise<void> {
-    return Promise.resolve();
+    return fetch('/assets/config/app-config.json')
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load app config: ${res.status}`);
+        return res.json() as Promise<AppConfig>;
+      })
+      .then((cfg) => {
+        this.config = cfg;
+      });
   }
 
   get apiBaseUrl(): string {
-    if (!this.config.apiBaseUrl || this.config.apiBaseUrl === '__API_BASE_URL__') {
+    if (!this.config.apiBaseUrl) {
       throw new Error('API_BASE_URL is not configured.');
     }
-
     return this.config.apiBaseUrl.replace(/\/+$/, '');
   }
 
   get wsBaseUrl(): string {
-    if (!this.config.wsBaseUrl || this.config.wsBaseUrl === '__WS_BASE_URL__') {
-      return '';
-    }
-
-    return this.config.wsBaseUrl.replace(/\/+$/, '');
+    return (this.config.wsBaseUrl ?? '').replace(/\/+$/, '');
   }
 }

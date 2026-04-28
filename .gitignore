@@ -4,6 +4,7 @@ dist/
 coverage/
 .env
 src/app/core/config/generated-runtime-config.ts
+src/assets/config/app-config.json
 .DS_Store
 Thumbs.db
 *.log

@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 
 const rootDir = process.cwd();
 const envPath = resolve(rootDir, '.env');
-const outputPath = resolve(rootDir, 'src/app/core/config/generated-runtime-config.ts');
+const outputPath = resolve(rootDir, 'src/assets/config/app-config.json');
 
 function readDotEnv(filePath) {
   if (!existsSync(filePath)) {
@@ -39,13 +39,9 @@ if (!apiBaseUrl) {
   throw new Error('API_BASE_URL is required in .env or environment variables.');
 }
 
-const fileContent = `import { AppConfig } from './app-config.model';
-
-export const GENERATED_RUNTIME_CONFIG: AppConfig = {
-  apiBaseUrl: ${JSON.stringify(apiBaseUrl)},
-  wsBaseUrl: ${JSON.stringify(wsBaseUrl)}
-};
-`;
+const config = { apiBaseUrl, wsBaseUrl };
 
 mkdirSync(dirname(outputPath), { recursive: true });
-writeFileSync(outputPath, fileContent, 'utf8');
+writeFileSync(outputPath, JSON.stringify(config, null, 2), 'utf8');
+
+console.log(`app-config.json generated → ${outputPath}`);

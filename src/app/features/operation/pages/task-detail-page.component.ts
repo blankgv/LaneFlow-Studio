@@ -12,8 +12,10 @@ import { forkJoin, of, switchMap } from 'rxjs';
 
 import { FormField } from '../../design/models/dynamic-form.model';
 import { Evidence, EvidenceCategory, PendingEvidence } from '../models/evidence.model';
+import { ProcedureInstance } from '../models/procedure.model';
 import { TaskInstance } from '../models/task-instance.model';
 import { EvidencesApiService } from '../services/evidences-api.service';
+import { ProceduresApiService } from '../services/procedures-api.service';
 import { TasksApiService } from '../services/tasks-api.service';
 
 @Component({
@@ -37,6 +39,19 @@ import { TasksApiService } from '../services/tasks-api.service';
           {{ departmentLabel() }}
         </span>
       </header>
+
+      <!-- Acción del nodo anterior -->
+      <div class="prev-action" *ngIf="procedure()?.lastAction">
+        <div class="prev-action__icon" [class]="prevActionClass()">
+          <mat-icon>{{ prevActionIcon() }}</mat-icon>
+        </div>
+        <div class="prev-action__body">
+          <span class="prev-action__label">Acción anterior · {{ procedure()?.lastCompletedTaskName || procedure()?.lastCompletedNodeId }}</span>
+          <strong class="prev-action__action">{{ prevActionLabel() }}</strong>
+          <span class="prev-action__meta" *ngIf="procedure()?.lastCompletedBy">por {{ procedure()!.lastCompletedBy }}</span>
+          <p class="prev-action__comment" *ngIf="procedure()?.lastComment">"{{ procedure()!.lastComment }}"</p>
+        </div>
+      </div>
 
       <!-- Error completar -->
       <div class="complete-error" *ngIf="completeError()">
@@ -394,6 +409,70 @@ import { TasksApiService } from '../services/tasks-api.service';
       height: 13px;
     }
 
+    /* Acción anterior */
+    .prev-action {
+      display: flex;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .prev-action__icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+
+    .prev-action__icon mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+    }
+
+    .prev-action__icon--approved { background: rgba(22,101,52,.1); color: #166534; }
+    .prev-action__icon--rejected { background: var(--danger-soft); color: var(--danger); }
+    .prev-action__icon--observed { background: rgba(180,83,9,.08); color: var(--warning); }
+
+    .prev-action__body {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .prev-action__label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .prev-action__action {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .prev-action__meta {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+    .prev-action__comment {
+      margin: 4px 0 0;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-style: italic;
+      border-left: 2px solid var(--border);
+      padding-left: 8px;
+    }
+
     /* Error completar */
     .complete-error {
       display: flex;
@@ -679,9 +758,11 @@ export class TaskDetailPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly tasksApi = inject(TasksApiService);
   private readonly evidencesApi = inject(EvidencesApiService);
+  private readonly proceduresApi = inject(ProceduresApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly task = signal<TaskInstance | null>(null);
+  protected readonly procedure = signal<ProcedureInstance | null>(null);
   protected readonly procedureEvidences = signal<Evidence[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal('');
@@ -848,6 +929,7 @@ export class TaskDetailPageComponent implements OnInit {
         this.task.set(task);
         this.initValues(task);
         this.loadEvidences(task);
+        this.loadProcedure(task);
         this.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {
@@ -917,6 +999,43 @@ export class TaskDetailPageComponent implements OnInit {
       next: (evidences) => this.procedureEvidences.set(evidences),
       error: () => this.procedureEvidences.set([])
     });
+  }
+
+  private loadProcedure(task: TaskInstance): void {
+    if (!task.procedureId) return;
+    this.proceduresApi.getProcedure(task.procedureId).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: (procedure) => this.procedure.set(procedure),
+      error: () => { /* non-critical */ }
+    });
+  }
+
+  protected prevActionLabel(): string {
+    const action = this.procedure()?.lastAction;
+    const map: Record<string, string> = {
+      APPROVE: 'Aprobada',
+      REJECT: 'Rechazada',
+      OBSERVE: 'Observada',
+      COMPLETE: 'Completada'
+    };
+    return action ? (map[action] ?? action) : '';
+  }
+
+  protected prevActionIcon(): string {
+    const action = this.procedure()?.lastAction;
+    if (action === 'APPROVE') return 'thumb_up';
+    if (action === 'REJECT') return 'cancel';
+    if (action === 'OBSERVE') return 'visibility';
+    return 'check_circle';
+  }
+
+  protected prevActionClass(): string {
+    const action = this.procedure()?.lastAction;
+    if (action === 'APPROVE') return 'prev-action__icon prev-action__icon--approved';
+    if (action === 'REJECT') return 'prev-action__icon prev-action__icon--rejected';
+    if (action === 'OBSERVE') return 'prev-action__icon prev-action__icon--observed';
+    return 'prev-action__icon';
   }
 
   private formatValue(value: unknown): string {

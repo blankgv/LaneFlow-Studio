@@ -193,11 +193,21 @@ import { ProceduresApiService } from '../services/procedures-api.service';
             No hay eventos de historial.
           </div>
           <ol class="timeline" *ngIf="history() && history()!.history.length > 0">
-            <li *ngFor="let item of history()!.history">
-              <span class="timeline__dot"></span>
-              <div>
-                <strong>{{ item.title || item.action }}</strong>
-                <p>{{ item.message }}</p>
+            <li *ngFor="let item of history()!.history" [class]="'timeline__item ' + historyClass(item.action)">
+              <span class="timeline__dot">
+                <mat-icon>{{ historyIcon(item.action) }}</mat-icon>
+              </span>
+              <div class="timeline__content">
+                <div class="timeline__row">
+                  <strong>{{ historyActionLabel(item.action) || item.title || item.action }}</strong>
+                  <span class="timeline__status-pair" *ngIf="item.statusBefore && item.statusAfter && item.statusBefore !== item.statusAfter">
+                    <span class="status-mini" [class]="statusClass(item.statusBefore)">{{ statusLabel(item.statusBefore) }}</span>
+                    <mat-icon class="arrow-icon">arrow_forward</mat-icon>
+                    <span class="status-mini" [class]="statusClass(item.statusAfter)">{{ statusLabel(item.statusAfter) }}</span>
+                  </span>
+                </div>
+                <p *ngIf="item.message">{{ item.message }}</p>
+                <p class="timeline__comment" *ngIf="item.metadata?.['comment']">"{{ item.metadata['comment'] }}"</p>
                 <small>
                   {{ item.createdAt | date:'dd/MM/yyyy HH:mm' }}
                   <ng-container *ngIf="item.username"> · {{ item.username }}</ng-container>
@@ -375,34 +385,147 @@ import { ProceduresApiService } from '../services/procedures-api.service';
 
     .timeline {
       list-style: none;
-      display: grid;
-      gap: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
       margin: 0;
       padding: 0;
     }
 
-    .timeline li {
+    .timeline__item {
       display: grid;
-      grid-template-columns: 16px minmax(0, 1fr);
+      grid-template-columns: 32px minmax(0, 1fr);
       gap: 10px;
       position: relative;
+      padding-bottom: 18px;
     }
+
+    .timeline__item:last-child { padding-bottom: 0; }
+
+    .timeline__item::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .timeline__item:last-child::before { display: none; }
 
     .timeline__dot {
-      width: 9px;
-      height: 9px;
-      margin-top: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      background: var(--accent);
+      flex-shrink: 0;
+      background: var(--surface-2);
+      border: 2px solid var(--border);
+      color: var(--text-muted);
+      z-index: 1;
     }
 
-    .timeline p {
-      margin: 3px 0;
+    .timeline__dot mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+
+    .timeline__item--approved .timeline__dot {
+      background: rgba(22,101,52,.1);
+      border-color: #16a34a;
+      color: #166534;
+    }
+
+    .timeline__item--rejected .timeline__dot {
+      background: var(--danger-soft);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .timeline__item--observed .timeline__dot {
+      background: rgba(180,83,9,.08);
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+
+    .timeline__item--started .timeline__dot {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-strong);
+    }
+
+    .timeline__item--resolved .timeline__dot {
+      background: rgba(109,40,217,.08);
+      border-color: #7c3aed;
+      color: #7c3aed;
+    }
+
+    .timeline__content {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding-top: 5px;
+    }
+
+    .timeline__row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .timeline__row strong {
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+
+    .timeline__status-pair {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .arrow-icon {
+      font-size: 13px;
+      width: 13px;
+      height: 13px;
+      color: var(--text-muted);
+    }
+
+    .status-mini {
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+
+    .status-mini.status-chip--active  { background: var(--accent-soft); color: var(--accent-strong); }
+    .status-mini.status-chip--observed { background: rgba(180,83,9,.08); color: var(--warning); }
+    .status-mini.status-chip--done    { background: rgba(22,101,52,.1); color: #166534; }
+    .status-mini.status-chip--rejected { background: var(--danger-soft); color: var(--danger); }
+
+    .timeline__content p {
+      margin: 2px 0 0;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .timeline__comment {
+      font-style: italic;
+      border-left: 2px solid var(--border);
+      padding-left: 8px;
+      margin-top: 2px !important;
     }
 
     .timeline small {
       color: var(--text-muted);
-      font-size: 0.74rem;
+      font-size: 0.73rem;
     }
 
     .evidence-list {
@@ -614,6 +737,41 @@ export class ProcedureDetailPageComponent implements OnInit {
       CANCELLED: 'El tramite fue cancelado.'
     };
     return messages[status] ?? '';
+  }
+
+  protected historyActionLabel(action: string): string {
+    const labels: Record<string, string> = {
+      PROCEDURE_STARTED: 'Tramite iniciado',
+      TASK_CLAIMED: 'Tarea tomada',
+      TASK_COMPLETED: 'Tarea completada',
+      TASK_APPROVED: 'Tarea aprobada',
+      TASK_REJECTED: 'Tarea rechazada',
+      TASK_OBSERVED: 'Tarea observada',
+      OBSERVATION_RESOLVED: 'Observacion subsanada'
+    };
+    return labels[action] ?? '';
+  }
+
+  protected historyIcon(action: string): string {
+    const icons: Record<string, string> = {
+      PROCEDURE_STARTED: 'play_circle',
+      TASK_CLAIMED: 'pan_tool',
+      TASK_COMPLETED: 'check_circle',
+      TASK_APPROVED: 'thumb_up',
+      TASK_REJECTED: 'cancel',
+      TASK_OBSERVED: 'visibility',
+      OBSERVATION_RESOLVED: 'task_alt'
+    };
+    return icons[action] ?? 'radio_button_unchecked';
+  }
+
+  protected historyClass(action: string): string {
+    if (action === 'TASK_APPROVED') return 'timeline__item--approved';
+    if (action === 'TASK_REJECTED') return 'timeline__item--rejected';
+    if (action === 'TASK_OBSERVED') return 'timeline__item--observed';
+    if (action === 'PROCEDURE_STARTED') return 'timeline__item--started';
+    if (action === 'OBSERVATION_RESOLVED') return 'timeline__item--resolved';
+    return '';
   }
 
   protected categoryLabel(category: Evidence['category']): string {

@@ -16,6 +16,7 @@ import { AdminDepartmentsService } from '../../admin/services/admin-departments.
 import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { AssignDepartmentDialogComponent } from '../components/assign-department-dialog/assign-department-dialog.component';
 import { BpmnEditorComponent, BpmnValidationSummary, LaneAddedEvent, LaneInsertRequest, SelectedFlowElement } from '../components/bpmn-editor/bpmn-editor.component';
+import { FlowConditionDialogComponent } from '../components/flow-condition-dialog/flow-condition-dialog.component';
 import { FormPanelComponent } from '../components/form-panel/form-panel.component';
 import { PresenceIndicatorComponent } from '../components/presence-indicator/presence-indicator.component';
 import { TasksPanelComponent } from '../components/tasks-panel/tasks-panel.component';
@@ -142,46 +143,7 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
             </button>
           </div>
 
-          <!-- Editor de condición (sobrescribe el panel cuando hay un flujo seleccionado) -->
-          <div class="panel-body" *ngIf="selectedFlow(); else normalPanel">
-            <div class="condition-editor">
-              <div class="condition-editor__header">
-                <mat-icon>device_hub</mat-icon>
-                <span>Condición del flujo</span>
-                <button class="condition-editor__close" type="button" (click)="selectedFlow.set(null)">
-                  <mat-icon>close</mat-icon>
-                </button>
-              </div>
-
-              <div class="condition-editor__body">
-                <label class="condition-editor__label">Expresión de condición</label>
-                <textarea
-                  class="condition-editor__input"
-                  rows="5"
-                  [placeholder]="conditionPlaceholder"
-                  [value]="conditionDraft()"
-                  (input)="conditionDraft.set($any($event.target).value)"
-                ></textarea>
-                <p class="condition-editor__hint">
-                  Usa expresiones EL de Camunda.<br>
-                  Ejemplo: <code>&#36;&#123;variable == valor&#125;</code>
-                </p>
-              </div>
-
-              <div class="condition-editor__actions">
-                <button mat-stroked-button type="button" (click)="selectedFlow.set(null)">
-                  Cancelar
-                </button>
-                <button mat-flat-button color="primary" type="button" (click)="applyCondition()">
-                  <mat-icon>check</mat-icon>
-                  Aplicar
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tareas / Historial (panel normal) -->
-          <ng-template #normalPanel>
+          <!-- Tareas / Historial -->
 
             <!-- Tareas -->
             <div class="panel-body" *ngIf="activeTab() === 'tasks'">
@@ -237,8 +199,6 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
               </ul>
 
             </div>
-
-          </ng-template>
 
         </aside>
       </div>
@@ -564,113 +524,6 @@ type SaveState = 'saved' | 'saving' | 'pending' | 'error';
       flex-shrink: 0;
     }
 
-    /* Editor de condición */
-    .condition-editor {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      padding: 0;
-    }
-
-    .condition-editor__header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 16px 12px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.86rem;
-      font-weight: 600;
-      color: var(--text);
-      flex-shrink: 0;
-    }
-
-    .condition-editor__header mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-      color: var(--accent-strong);
-    }
-
-    .condition-editor__close {
-      margin-left: auto;
-      display: inline-flex;
-      align-items: center;
-      background: transparent;
-      border: 0;
-      cursor: pointer;
-      color: var(--text-muted);
-      padding: 2px;
-      border-radius: 4px;
-      transition: color 120ms;
-    }
-
-    .condition-editor__close:hover { color: var(--text); }
-
-    .condition-editor__close mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
-
-    .condition-editor__body {
-      flex: 1;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .condition-editor__label {
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .condition-editor__input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--surface-2);
-      color: var(--text);
-      font-family: 'Courier New', monospace;
-      font-size: 0.84rem;
-      resize: vertical;
-      transition: border-color 150ms;
-      outline: none;
-    }
-
-    .condition-editor__input:focus {
-      border-color: var(--accent);
-    }
-
-    .condition-editor__hint {
-      font-size: 0.74rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-      margin: 0;
-    }
-
-    .condition-editor__hint code {
-      background: var(--surface-3);
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 0.78rem;
-      color: var(--accent-strong);
-    }
-
-    .condition-editor__actions {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-      padding: 12px 16px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
     /* Status badge */
     .status-badge {
       display: inline-flex;
@@ -744,11 +597,7 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   protected readonly selectedTask = signal<WorkflowTask | null>(null);
   protected readonly versions = signal<WorkflowVersion[]>([]);
   protected readonly loadingHistory = signal(false);
-  protected readonly selectedFlow = signal<SelectedFlowElement | null>(null);
-  protected readonly conditionDraft = signal('');
-
   protected collaboration: CollaborationSession | null = null;
-  protected readonly conditionPlaceholder = 'ej: ${aprobado == true}';
 
   @ViewChild(BpmnEditorComponent) private bpmnEditor?: BpmnEditorComponent;
 
@@ -980,8 +829,16 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
   }
 
   protected onFlowSelected(flow: SelectedFlowElement | null): void {
-    this.selectedFlow.set(flow);
-    this.conditionDraft.set(flow?.condition ?? '');
+    if (!flow) return;
+    const ref = this.dialog.open(FlowConditionDialogComponent, {
+      width: '540px',
+      data: { ...flow, forms: this.snapshot()?.forms ?? [] }
+    });
+    ref.afterClosed().subscribe((expression: string | undefined) => {
+      if (expression !== undefined) {
+        this.bpmnEditor?.setCondition(flow.id, expression);
+      }
+    });
   }
 
   protected onPoolCreated(poolId: string): void {
@@ -1019,13 +876,6 @@ export class PolicyEditorPageComponent implements OnInit, OnDestroy {
 
   protected onTaskOutsideLane(): void {
     this.publishError.set('Todas las tareas deben estar dentro de una lane/departamento.');
-  }
-
-  protected applyCondition(): void {
-    const flow = this.selectedFlow();
-    if (!flow || !this.bpmnEditor) return;
-    this.bpmnEditor.setCondition(flow.id, this.conditionDraft());
-    this.selectedFlow.set(null);
   }
 
   protected saveStateIcon(): string {

@@ -2,22 +2,10 @@ services:
   laneflow-studio:
     build:
       context: .
-      target: dev
-    container_name: laneflow-studio
-    ports:
-      - "4200:4200"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    restart: unless-stopped
-
-  laneflow-studio-prod:
-    build:
-      context: .
       target: production
       args:
         API_BASE_URL: ${API_BASE_URL}
-    container_name: laneflow-studio-prod
+    container_name: laneflow-studio
     ports:
-      - "8081:80"
+      - "${PORT:-4200}:80"
     restart: unless-stopped

@@ -58,25 +58,32 @@ interface NavItem {
             </div>
           </section>
 
-          <a class="nav-item" routerLink="/operation/procedures" routerLinkActive="is-active">
-            <mat-icon>folder_open</mat-icon>
-            <span>Tramites</span>
-          </a>
+          <section class="nav-section">
+            <button
+              type="button"
+              class="nav-section__trigger"
+              [class.is-open]="operacionesExpanded()"
+              (click)="toggleOperacionesExpanded()"
+            >
+              <span class="nav-section__title">
+                <mat-icon>pending_actions</mat-icon>
+                <span>Operaciones</span>
+              </span>
+              <mat-icon class="nav-section__chevron">expand_more</mat-icon>
+            </button>
 
-          <a class="nav-item" routerLink="/operation/start" routerLinkActive="is-active">
-            <mat-icon>play_circle</mat-icon>
-            <span>Iniciar tramite</span>
-          </a>
-
-          <a class="nav-item" routerLink="/operation/applicants" routerLinkActive="is-active">
-            <mat-icon>person_add</mat-icon>
-            <span>Solicitantes</span>
-          </a>
-
-          <a class="nav-item" routerLink="/operation/tasks" routerLinkActive="is-active">
-            <mat-icon>assignment</mat-icon>
-            <span>Tareas</span>
-          </a>
+            <div class="nav-section__items" *ngIf="operacionesExpanded()">
+              <a
+                *ngFor="let item of operacionesNav"
+                class="nav-item"
+                [routerLink]="item.link"
+                routerLinkActive="is-active"
+              >
+                <mat-icon>{{ item.icon }}</mat-icon>
+                <span>{{ item.label }}</span>
+              </a>
+            </div>
+          </section>
 
           <section class="nav-section" *ngIf="canAdmin">
             <button
@@ -365,6 +372,7 @@ export class AppShellComponent {
   protected readonly authSession = inject(AuthSessionService);
   private readonly router = inject(Router);
   protected readonly designExpanded = signal(true);
+  protected readonly operacionesExpanded = signal(true);
   protected readonly adminExpanded = signal(true);
 
   protected readonly canDesign = this.authSession.hasPermission('WORKFLOW_READ');
@@ -375,6 +383,12 @@ export class AppShellComponent {
 
   protected readonly designNav: NavItem[] = [
     { label: 'Politicas', icon: 'policy', link: '/design' }
+  ];
+
+  protected readonly operacionesNav: NavItem[] = [
+    { label: 'Tramites',     icon: 'folder_open',  link: '/operation/procedures' },
+    { label: 'Solicitantes', icon: 'people',        link: '/operation/applicants' },
+    { label: 'Tareas',       icon: 'assignment',    link: '/operation/tasks' },
   ];
 
   protected readonly adminNav: NavItem[] = [
@@ -401,6 +415,10 @@ export class AppShellComponent {
 
   protected toggleDesignExpanded(): void {
     this.designExpanded.update((v) => !v);
+  }
+
+  protected toggleOperacionesExpanded(): void {
+    this.operacionesExpanded.update((v) => !v);
   }
 
   protected toggleAdminExpanded(): void {

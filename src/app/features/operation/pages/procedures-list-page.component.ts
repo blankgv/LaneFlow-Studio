@@ -1,10 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTableModule } from '@angular/material/table';
 
 import { ProcedureInstance, ProcedureStatus } from '../models/procedure.model';
 import { ProceduresApiService } from '../services/procedures-api.service';
@@ -13,31 +17,49 @@ import { ProceduresApiService } from '../services/procedures-api.service';
   selector: 'app-procedures-list-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule],
+  imports: [CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatTableModule],
   template: `
-    <section class="procedures-page">
+    <section class="page">
+
       <header class="page-header">
-        <div>
+        <div class="page-header__text">
           <h1>Tramites</h1>
-          <p>Consulta los tramites iniciados, su estado y etapa actual.</p>
+          <p>Consulta y gestiona los tramites iniciados en el sistema.</p>
         </div>
-        <div class="header-actions">
-          <a mat-flat-button color="primary" routerLink="/operation/start">
-            <mat-icon>play_arrow</mat-icon>
-            Iniciar tramite
-          </a>
-          <button mat-stroked-button type="button" (click)="reload()">
-            <mat-icon>refresh</mat-icon>
-            Actualizar
-          </button>
-        </div>
+        <a mat-flat-button color="primary" routerLink="/operation/start">
+          <mat-icon>add</mat-icon>
+          Nuevo tramite
+        </a>
       </header>
 
+      <!-- Toolbar -->
+      <div class="toolbar" *ngIf="!loading() && !error()">
+        <label class="search-bar">
+          <mat-icon class="search-bar__icon">search</mat-icon>
+          <input
+            class="search-bar__input"
+            type="search"
+            placeholder="Buscar por código, política o solicitante"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="searchTerm.set($event)"
+          />
+          <button *ngIf="searchTerm()" type="button" class="search-bar__clear" (click)="searchTerm.set('')">
+            <mat-icon>close</mat-icon>
+          </button>
+        </label>
+        <button mat-stroked-button type="button" (click)="reload()">
+          <mat-icon>refresh</mat-icon>
+          Actualizar
+        </button>
+      </div>
+
+      <!-- Loading -->
       <div class="state" *ngIf="loading()">
         <mat-icon>hourglass_empty</mat-icon>
         <span>Cargando tramites...</span>
       </div>
 
+      <!-- Error -->
       <div class="state state--error" *ngIf="!loading() && error()">
         <mat-icon>error_outline</mat-icon>
         <strong>No se pudieron cargar los tramites</strong>
@@ -45,68 +67,99 @@ import { ProceduresApiService } from '../services/procedures-api.service';
         <button mat-stroked-button type="button" (click)="reload()">Reintentar</button>
       </div>
 
+      <!-- Empty -->
       <div class="state" *ngIf="!loading() && !error() && procedures().length === 0">
         <mat-icon>folder_open</mat-icon>
         <strong>No hay tramites iniciados</strong>
-        <span>Inicia un tramite desde una politica publicada para verlo aqui.</span>
-        <a mat-stroked-button routerLink="/operation/start">Iniciar tramite</a>
+        <span>Crea el primer tramite desde una politica publicada.</span>
+        <a mat-stroked-button routerLink="/operation/start">Nuevo tramite</a>
       </div>
 
-      <div class="procedures-list" *ngIf="!loading() && !error() && procedures().length > 0">
-        <article class="procedure-card" *ngFor="let procedure of procedures()">
-          <div class="procedure-card__main">
-            <div class="procedure-card__title">
-              <strong>{{ procedure.code }}</strong>
-              <span class="status-chip" [class]="statusClass(procedure.status)">
-                {{ statusLabel(procedure.status) }}
-              </span>
-            </div>
-            <span class="procedure-card__workflow">{{ procedure.workflowName }}</span>
-            <div class="procedure-card__meta">
-              <span>
-                <mat-icon>person</mat-icon>
-                {{ procedure.applicantName }}
-              </span>
-              <span *ngIf="procedure.currentNodeName">
-                <mat-icon>near_me</mat-icon>
-                {{ procedure.currentNodeName }}
-              </span>
-              <span *ngIf="procedure.currentAssigneeUsername">
-                <mat-icon>account_circle</mat-icon>
-                {{ procedure.currentAssigneeUsername }}
-              </span>
-              <span>
-                <mat-icon>schedule</mat-icon>
-                {{ (procedure.startedAt || procedure.createdAt) | date:'dd/MM/yyyy HH:mm' }}
-              </span>
-            </div>
-          </div>
-          <a mat-stroked-button [routerLink]="['/operation/procedures', procedure.id]">
-            <mat-icon>open_in_new</mat-icon>
-            Ver detalle
-          </a>
-        </article>
+      <!-- No results from search -->
+      <div class="state" *ngIf="!loading() && !error() && procedures().length > 0 && filtered().length === 0">
+        <mat-icon>search_off</mat-icon>
+        <strong>Sin resultados</strong>
+        <span>Ningún tramite coincide con "{{ searchTerm() }}".</span>
       </div>
+
+      <!-- Table -->
+      <div class="table-wrap" *ngIf="!loading() && !error() && filtered().length > 0">
+        <table mat-table [dataSource]="filtered()" class="procedures-table">
+
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let row">
+              <strong class="code-cell">{{ row.code }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="workflow">
+            <th mat-header-cell *matHeaderCellDef>Política</th>
+            <td mat-cell *matCellDef="let row">{{ row.workflowName }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="applicant">
+            <th mat-header-cell *matHeaderCellDef>Solicitante</th>
+            <td mat-cell *matCellDef="let row">{{ row.applicantName }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="status-chip" [class]="statusClass(row.status)">
+                {{ statusLabel(row.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="stage">
+            <th mat-header-cell *matHeaderCellDef>Etapa</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="muted">{{ row.currentNodeName || '—' }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Fecha</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="muted">{{ (row.startedAt || row.createdAt) | date:'dd/MM/yyyy' }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <a mat-icon-button [routerLink]="['/operation/procedures', row.id]" title="Ver detalle">
+                <mat-icon>open_in_new</mat-icon>
+              </a>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+        </table>
+      </div>
+
     </section>
   `,
   styles: [`
-    .procedures-page {
-      max-width: 1060px;
+    .page {
       padding: 28px 32px;
+      max-width: 1100px;
     }
 
     .page-header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 22px;
+      margin-bottom: 20px;
     }
 
     .page-header h1 {
       margin: 0;
-      color: var(--text);
       font-size: 1.35rem;
+      color: var(--text);
     }
 
     .page-header p {
@@ -115,11 +168,56 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       font-size: 0.86rem;
     }
 
-    .header-actions {
+    .toolbar {
       display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .search-bar {
+      flex: 1;
+      display: flex;
+      align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      height: 38px;
+    }
+
+    .search-bar__icon {
+      color: var(--text-muted);
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .search-bar__input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 0.87rem;
+      outline: none;
+    }
+
+    .search-bar__clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      padding: 0;
+    }
+
+    .search-bar__clear mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
     .state {
@@ -145,85 +243,39 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       font-size: 0.96rem;
     }
 
-    .state--error,
-    .state--error mat-icon {
-      color: var(--danger);
-    }
+    .state--error, .state--error mat-icon { color: var(--danger); }
 
-    .procedures-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .procedure-card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 18px;
+    .table-wrap {
       border: 1px solid var(--border);
       border-radius: var(--radius);
+      overflow: hidden;
       background: var(--surface);
-      box-shadow: var(--shadow-sm);
     }
 
-    .procedure-card__main {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
+    .procedures-table {
+      width: 100%;
     }
 
-    .procedure-card__title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .procedure-card__title strong {
+    .code-cell {
+      font-size: 0.87rem;
       color: var(--text);
-      font-size: 0.96rem;
     }
 
-    .procedure-card__workflow {
+    .muted {
       color: var(--text-muted);
-      font-size: 0.8rem;
-    }
-
-    .procedure-card__meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .procedure-card__meta span {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: var(--surface-2);
-      color: var(--text-muted);
-      font-size: 0.72rem;
-    }
-
-    .procedure-card__meta mat-icon {
-      width: 13px;
-      height: 13px;
-      font-size: 13px;
+      font-size: 0.84rem;
     }
 
     .status-chip {
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      padding: 2px 8px;
+      padding: 2px 9px;
       font-size: 0.7rem;
       font-weight: 700;
       background: var(--surface-2);
       color: var(--text-muted);
+      white-space: nowrap;
     }
 
     .status-chip--active {
@@ -254,6 +306,19 @@ export class ProceduresListPageComponent implements OnInit {
   protected readonly procedures = signal<ProcedureInstance[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  protected readonly searchTerm = signal('');
+
+  protected readonly columns = ['code', 'workflow', 'applicant', 'status', 'stage', 'date', 'actions'];
+
+  protected readonly filtered = computed(() => {
+    const term = this.searchTerm().toLowerCase().trim();
+    if (!term) return this.procedures();
+    return this.procedures().filter((p) =>
+      p.code?.toLowerCase().includes(term) ||
+      p.workflowName?.toLowerCase().includes(term) ||
+      p.applicantName?.toLowerCase().includes(term)
+    );
+  });
 
   ngOnInit(): void {
     this.loadProcedures();

@@ -54,6 +54,29 @@ interface ApplicantForm {
         {{ success() }}
       </div>
 
+      <div class="credentials-banner" *ngIf="newCredentials()">
+        <div class="credentials-banner__header">
+          <mat-icon>key</mat-icon>
+          <strong>Credenciales de acceso generadas</strong>
+          <button type="button" class="credentials-banner__close" (click)="newCredentials.set(null)">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <p class="credentials-banner__note">
+          Comparte estas credenciales con el solicitante. La contraseña solo se muestra una vez.
+        </p>
+        <div class="credentials-banner__fields">
+          <div class="credentials-banner__field">
+            <span>Usuario</span>
+            <code>{{ newCredentials()!.username }}</code>
+          </div>
+          <div class="credentials-banner__field">
+            <span>Contraseña inicial</span>
+            <code>{{ newCredentials()!.password }}</code>
+          </div>
+        </div>
+      </div>
+
       <div class="applicants-grid">
         <form class="panel" (ngSubmit)="createApplicant()">
           <h2>Nuevo solicitante</h2>
@@ -345,6 +368,77 @@ interface ApplicantForm {
       font-size: 0.76rem;
     }
 
+    .credentials-banner {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+      border: 1.5px solid var(--accent);
+      border-radius: var(--radius);
+      background: var(--accent-soft);
+    }
+
+    .credentials-banner__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-strong);
+    }
+
+    .credentials-banner__header mat-icon:first-child {
+      font-size: 1.2rem;
+    }
+
+    .credentials-banner__header strong {
+      flex: 1;
+      font-size: 0.9rem;
+    }
+
+    .credentials-banner__close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 0;
+    }
+
+    .credentials-banner__note {
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .credentials-banner__fields {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .credentials-banner__field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .credentials-banner__field code {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.88rem;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
     @media (max-width: 900px) {
       .applicants-grid,
       .form-row {
@@ -362,6 +456,7 @@ export class ApplicantsPageComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly error = signal('');
   protected readonly success = signal('');
+  protected readonly newCredentials = signal<{ username: string; password: string } | null>(null);
 
   protected form: ApplicantForm = this.emptyForm();
 
@@ -401,6 +496,9 @@ export class ApplicantsPageComponent implements OnInit {
       next: (applicant) => {
         this.applicants.update((list) => [applicant, ...list]);
         this.success.set('Solicitante creado correctamente.');
+        if (applicant.initialPassword && applicant.username) {
+          this.newCredentials.set({ username: applicant.username, password: applicant.initialPassword });
+        }
         this.form = this.emptyForm();
         this.saving.set(false);
       },

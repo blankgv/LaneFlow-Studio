@@ -15,6 +15,9 @@ export interface Applicant {
   phone?: string | null;
   address?: string | null;
   active?: boolean;
+  userId?: string | null;
+  username?: string | null;
+  initialPassword?: string | null;
 }
 
 export interface ApplicantPayload {

@@ -23,16 +23,22 @@ export const appRoutes: Routes = [
       },
       {
         path: 'admin',
+        canActivate: [permissionGuard],
+        data: { permissions: ['DEPT_READ'] },
         loadChildren: () =>
           import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES)
       },
       {
         path: 'design',
+        canActivate: [permissionGuard],
+        data: { permissions: ['WORKFLOW_READ'] },
         loadChildren: () =>
           import('./features/design/design.routes').then((m) => m.DESIGN_ROUTES)
       },
       {
         path: 'operation',
+        canActivate: [permissionGuard],
+        data: { permissions: ['TRAMITE_READ'] },
         loadChildren: () =>
           import('./features/operation/operation.routes').then((m) => m.OPERATION_ROUTES)
       }

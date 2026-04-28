@@ -5,7 +5,8 @@ services:
       target: production
       args:
         API_BASE_URL: ${API_BASE_URL}
+        WS_BASE_URL: ${WS_BASE_URL}
     container_name: laneflow-studio
     ports:
-      - "${PORT:-4200}:80"
+      - "${PORT:-4200}:8080"
     restart: unless-stopped

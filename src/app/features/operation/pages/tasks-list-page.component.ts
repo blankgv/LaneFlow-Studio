@@ -414,6 +414,16 @@ export class TasksListPageComponent implements OnInit {
       ?? '';
   }
 
+  private deduplicateById(tasks: TaskInstance[]): TaskInstance[] {
+    const seen = new Set<string>();
+    return tasks.filter((t) => {
+      const id = this.taskId(t);
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }
+
   private loadAll(): void {
     this.loading.set(true);
     this.error.set('');
@@ -428,7 +438,7 @@ export class TasksListPageComponent implements OnInit {
     this.tasksApi.getAvailableTasks().pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: (list) => { this.available.set(list); availableDone = true; checkDone(); },
+      next: (list) => { this.available.set(this.deduplicateById(list)); availableDone = true; checkDone(); },
       error: (err: HttpErrorResponse) => {
         this.error.set(err.error?.message || 'No fue posible cargar las tareas.');
         availableDone = true; checkDone();
@@ -438,7 +448,7 @@ export class TasksListPageComponent implements OnInit {
     this.tasksApi.getMyTasks().pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: (list) => { this.mine.set(list); mineDone = true; checkDone(); },
+      next: (list) => { this.mine.set(this.deduplicateById(list)); mineDone = true; checkDone(); },
       error: () => { mineDone = true; checkDone(); }
     });
   }

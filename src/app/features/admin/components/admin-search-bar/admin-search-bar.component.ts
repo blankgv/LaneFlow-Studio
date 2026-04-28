@@ -35,7 +35,7 @@ import { MatIconModule } from '@angular/material/icon';
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      width: min(360px, 100%);
+      width: min(480px, 100%);
       padding: 0 10px;
       height: 36px;
       border-radius: var(--radius);

@@ -26,10 +26,6 @@ import { ProceduresApiService } from '../services/procedures-api.service';
           <h1>Tramites</h1>
           <p>Consulta y gestiona los tramites iniciados en el sistema.</p>
         </div>
-        <a mat-flat-button color="primary" routerLink="/operation/start">
-          <mat-icon>add</mat-icon>
-          Nuevo tramite
-        </a>
       </header>
 
       <!-- Toolbar -->
@@ -47,10 +43,10 @@ import { ProceduresApiService } from '../services/procedures-api.service';
             <mat-icon>close</mat-icon>
           </button>
         </label>
-        <button mat-stroked-button type="button" (click)="reload()">
-          <mat-icon>refresh</mat-icon>
-          Actualizar
-        </button>
+        <a mat-flat-button color="primary" routerLink="/operation/start">
+          <mat-icon>add</mat-icon>
+          Nuevo tramite
+        </a>
       </div>
 
       <!-- Loading -->
@@ -171,12 +167,12 @@ import { ProceduresApiService } from '../services/procedures-api.service';
     .toolbar {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
       margin-bottom: 16px;
     }
 
     .search-bar {
-      flex: 1;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -184,7 +180,8 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: var(--surface);
-      height: 38px;
+      height: 36px;
+      width: min(480px, 100%);
     }
 
     .search-bar__icon {

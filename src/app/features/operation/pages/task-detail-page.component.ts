@@ -48,23 +48,26 @@ import { TasksApiService } from '../services/tasks-api.service';
       </div>
 
       <!-- Sin formulario -->
-      <div class="no-form" *ngIf="!task()?.form">
-        <mat-icon>info_outline</mat-icon>
-        <p>Esta tarea no tiene formulario asociado.<br>Puedes completarla directamente.</p>
-        <button mat-flat-button color="primary" [disabled]="completing()" (click)="submitAction('complete')">
-          <mat-icon>check_circle</mat-icon>
-          {{ completing() ? 'Completando...' : 'Completar tarea' }}
-        </button>
-      </div>
+      <div class="task-form" *ngIf="!task()?.form">
 
-      <section class="task-form" *ngIf="!task()?.form && procedureEvidences().length > 0">
         <div class="task-form__title">
-          <mat-icon>attach_file</mat-icon>
-          Evidencias del tramite
+          <mat-icon>info_outline</mat-icon>
+          Sin formulario
         </div>
-        <div class="evidence-groups">
-          <div>
-            <h3>Generales</h3>
+
+        <section class="context-panel" *ngIf="formDataEntries().length > 0">
+          <h2>Datos acumulados del tramite</h2>
+          <dl class="data-list">
+            <div *ngFor="let item of formDataEntries()">
+              <dt>{{ item.key }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="evidence-panel" *ngIf="generalEvidences().length > 0">
+          <h2>Evidencias del tramite</h2>
+          <div class="evidence-list">
             <article class="evidence-card" *ngFor="let evidence of generalEvidences()">
               <mat-icon>attach_file</mat-icon>
               <div>
@@ -73,25 +76,56 @@ import { TasksApiService } from '../services/tasks-api.service';
               </div>
               <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
             </article>
-            <p class="empty-evidence" *ngIf="generalEvidences().length === 0">Sin evidencia general.</p>
           </div>
-          <div>
-            <h3>Desde tareas</h3>
-            <article class="evidence-card" *ngFor="let evidence of taskEvidences()">
-              <mat-icon>assignment</mat-icon>
-              <div>
-                <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
-                <span>{{ evidence.fieldName || evidence.nodeId || 'Tarea' }} · {{ evidence.description || categoryLabel(evidence.category) }}</span>
-              </div>
-              <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
-            </article>
-            <p class="empty-evidence" *ngIf="taskEvidences().length === 0">Sin evidencia desde tareas.</p>
+        </section>
+
+        <section class="evidence-panel" *ngIf="taskAttachmentGroups().length > 0">
+          <h2>Adjuntos de formularios anteriores</h2>
+          <div class="attachment-groups">
+            <div class="attachment-group" *ngFor="let group of taskAttachmentGroups()">
+              <h3>{{ group.label }}</h3>
+              <article class="evidence-card" *ngFor="let evidence of group.items">
+                <mat-icon>assignment</mat-icon>
+                <div>
+                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                  <span>{{ evidence.fieldName || categoryLabel(evidence.category) }}</span>
+                </div>
+                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
+              </article>
+            </div>
           </div>
+        </section>
+
+        <div class="form-field">
+          <label class="form-field__label">Comentario</label>
+          <textarea
+            class="form-field__input"
+            rows="3"
+            name="noform_comment"
+            [(ngModel)]="comment"
+          ></textarea>
         </div>
-      </section>
+
+        <div class="task-form__actions">
+          <a mat-stroked-button routerLink="/operation/tasks">Cancelar</a>
+          <button mat-stroked-button type="button" [disabled]="completing()" (click)="submitAction('observe')">
+            <mat-icon>visibility</mat-icon>
+            Observar
+          </button>
+          <button mat-stroked-button type="button" [disabled]="completing()" (click)="submitAction('reject')">
+            <mat-icon>cancel</mat-icon>
+            Rechazar
+          </button>
+          <button mat-flat-button color="primary" type="button" [disabled]="completing()" (click)="submitAction('approve')">
+            <mat-icon>thumb_up</mat-icon>
+            {{ completing() ? 'Procesando...' : 'Aprobar' }}
+          </button>
+        </div>
+
+      </div>
 
       <!-- Formulario dinámico -->
-      <form class="task-form" (ngSubmit)="submitAction('complete')" *ngIf="task()?.form">
+      <form class="task-form" (ngSubmit)="$event.preventDefault()" *ngIf="task()?.form">
         <div class="task-form__title">
           <mat-icon>description</mat-icon>
           {{ task()!.form!.title }}
@@ -190,14 +224,16 @@ import { TasksApiService } from '../services/tasks-api.service';
           <dl class="data-list">
             <div *ngFor="let item of formDataEntries()">
               <dt>{{ item.key }}</dt>
-              <dd>{{ item.value }}</dd>
+              <dd>
+                {{ item.value }}
+              </dd>
             </div>
           </dl>
         </section>
 
-        <section class="evidence-panel" *ngIf="procedureEvidences().length > 0">
+        <section class="evidence-panel" *ngIf="generalEvidences().length > 0">
           <h2>Evidencias del tramite</h2>
-          <div class="evidence-groups">
+          <div class="evidence-list">
             <div>
               <h3>Generales</h3>
               <article class="evidence-card" *ngFor="let evidence of generalEvidences()">
@@ -208,9 +244,9 @@ import { TasksApiService } from '../services/tasks-api.service';
                 </div>
                 <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
               </article>
-              <p class="empty-evidence" *ngIf="generalEvidences().length === 0">Sin evidencia general.</p>
+              <p class="empty-evidence" *ngIf="generalEvidences().length === 0">Sin evidencias generales.</p>
             </div>
-            <div>
+            <div class="hidden-evidence-group">
               <h3>Desde tareas</h3>
               <article class="evidence-card" *ngFor="let evidence of taskEvidences()">
                 <mat-icon>assignment</mat-icon>
@@ -221,6 +257,23 @@ import { TasksApiService } from '../services/tasks-api.service';
                 <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
               </article>
               <p class="empty-evidence" *ngIf="taskEvidences().length === 0">Sin evidencia desde tareas.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="evidence-panel" *ngIf="taskAttachmentGroups().length > 0">
+          <h2>Adjuntos de formularios anteriores</h2>
+          <div class="attachment-groups">
+            <div class="attachment-group" *ngFor="let group of taskAttachmentGroups()">
+              <h3>{{ group.label }}</h3>
+              <article class="evidence-card" *ngFor="let evidence of group.items">
+                <mat-icon>assignment</mat-icon>
+                <div>
+                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                  <span>{{ evidence.fieldName || categoryLabel(evidence.category) }}</span>
+                </div>
+                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">Abrir</a>
+              </article>
             </div>
           </div>
         </section>
@@ -245,13 +298,9 @@ import { TasksApiService } from '../services/tasks-api.service';
             <mat-icon>cancel</mat-icon>
             Rechazar
           </button>
-          <button mat-stroked-button type="button" [disabled]="completing()" (click)="submitAction('approve')">
+          <button mat-flat-button color="primary" type="button" [disabled]="completing()" (click)="submitAction('approve')">
             <mat-icon>thumb_up</mat-icon>
-            Aprobar
-          </button>
-          <button mat-flat-button color="primary" type="submit" [disabled]="completing()">
-            <mat-icon>check_circle</mat-icon>
-            {{ completing() ? 'Completando...' : 'Completar tarea' }}
+            {{ completing() ? 'Procesando...' : 'Aprobar' }}
           </button>
         </div>
       </form>
@@ -367,28 +416,6 @@ import { TasksApiService } from '../services/tasks-api.service';
       color: var(--danger);
       display: inline-flex;
       align-items: center;
-    }
-
-    /* Sin formulario */
-    .no-form {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      padding: 40px;
-      text-align: center;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text-muted);
-      font-size: 0.86rem;
-    }
-
-    .no-form mat-icon {
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
-      color: var(--text-subtle);
     }
 
     /* Formulario */
@@ -559,13 +586,28 @@ import { TasksApiService } from '../services/tasks-api.service';
       overflow-wrap: anywhere;
     }
 
-    .evidence-groups {
+    .evidence-list {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 12px;
     }
 
-    .evidence-groups h3 {
+    .evidence-list h3 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font-size: 0.84rem;
+    }
+
+    .hidden-evidence-group {
+      display: none;
+    }
+
+    .attachment-groups {
+      display: grid;
+      gap: 14px;
+    }
+
+    .attachment-group h3 {
       margin: 0 0 8px;
       color: var(--text);
       font-size: 0.84rem;
@@ -579,7 +621,6 @@ import { TasksApiService } from '../services/tasks-api.service';
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: var(--surface-2);
-      margin-bottom: 8px;
     }
 
     .evidence-card > mat-icon {
@@ -788,6 +829,15 @@ export class TaskDetailPageComponent implements OnInit {
       key,
       value: this.formatValue(value)
     }));
+  }
+
+  protected taskAttachmentGroups(): Array<{ label: string; items: Evidence[] }> {
+    const groups = new Map<string, Evidence[]>();
+    this.taskEvidences().forEach((evidence) => {
+      const key = evidence.nodeId || 'Tarea sin nodo';
+      groups.set(key, [...(groups.get(key) ?? []), evidence]);
+    });
+    return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
   }
 
   private loadTask(): void {

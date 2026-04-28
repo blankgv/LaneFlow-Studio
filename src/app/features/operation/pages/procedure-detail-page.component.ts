@@ -145,36 +145,38 @@ import { ProceduresApiService } from '../services/procedures-api.service';
         </div>
 
         <section class="panel">
-          <h2>Evidencias</h2>
-          <div class="evidence-groups">
-            <div>
-              <h3>Evidencia general</h3>
-              <div class="empty-inline" *ngIf="generalEvidences().length === 0">
-                No hay evidencia general.
+          <h2>Evidencias del tramite</h2>
+          <div class="empty-inline" *ngIf="initialEvidences().length === 0">
+            No hay evidencias generales registradas.
+          </div>
+          <div class="evidence-list" *ngIf="initialEvidences().length > 0">
+            <article class="evidence-card" *ngFor="let evidence of initialEvidences()">
+              <mat-icon>attach_file</mat-icon>
+              <div>
+                <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
+                <span>{{ evidence.description || categoryLabel(evidence.category) }}</span>
+                <small>{{ evidence.uploadedBy || '-' }} · {{ evidence.createdAt | date:'dd/MM/yyyy HH:mm' }}</small>
               </div>
-              <article class="evidence-card" *ngFor="let evidence of generalEvidences()">
-                <mat-icon>attach_file</mat-icon>
-                <div>
-                  <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
-                  <span>{{ evidence.description || categoryLabel(evidence.category) }}</span>
-                  <small>{{ evidence.uploadedBy || '-' }} · {{ evidence.createdAt | date:'dd/MM/yyyy HH:mm' }}</small>
-                </div>
-                <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">
-                  Abrir
-                </a>
-              </article>
-            </div>
+              <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">
+                Abrir
+              </a>
+            </article>
+          </div>
+        </section>
 
-            <div>
-              <h3>Evidencia desde tareas</h3>
-              <div class="empty-inline" *ngIf="taskEvidences().length === 0">
-                No hay evidencia subida desde tareas.
-              </div>
-              <article class="evidence-card" *ngFor="let evidence of taskEvidences()">
+        <section class="panel">
+          <h2>Adjuntos enviados en tareas</h2>
+          <div class="empty-inline" *ngIf="taskAttachmentGroups().length === 0">
+            No hay adjuntos enviados desde formularios de tareas.
+          </div>
+          <div class="attachment-groups" *ngIf="taskAttachmentGroups().length > 0">
+            <div class="attachment-group" *ngFor="let group of taskAttachmentGroups()">
+              <h3>{{ group.label }}</h3>
+              <article class="evidence-card" *ngFor="let evidence of group.items">
                 <mat-icon>assignment</mat-icon>
                 <div>
                   <strong>{{ evidence.originalFileName || evidence.fileName }}</strong>
-                  <span>{{ evidence.fieldName || evidence.nodeId || 'Tarea' }} · {{ evidence.description || categoryLabel(evidence.category) }}</span>
+                  <span>{{ evidence.fieldName || categoryLabel(evidence.category) }}</span>
                   <small>{{ evidence.uploadedBy || '-' }} · {{ evidence.createdAt | date:'dd/MM/yyyy HH:mm' }}</small>
                 </div>
                 <a mat-stroked-button *ngIf="evidence.mediaLink" [href]="evidence.mediaLink" target="_blank" rel="noopener">
@@ -403,14 +405,19 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       font-size: 0.74rem;
     }
 
-    .evidence-groups {
+    .evidence-list {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 16px;
     }
 
-    .evidence-groups h3 {
-      margin: 0 0 10px;
+    .attachment-groups {
+      display: grid;
+      gap: 14px;
+    }
+
+    .attachment-group h3 {
+      margin: 0 0 8px;
       color: var(--text);
       font-size: 0.86rem;
     }
@@ -423,7 +430,6 @@ import { ProceduresApiService } from '../services/procedures-api.service';
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: var(--surface-2);
-      margin-bottom: 8px;
     }
 
     .evidence-card > mat-icon {
@@ -502,7 +508,7 @@ import { ProceduresApiService } from '../services/procedures-api.service';
     @media (max-width: 900px) {
       .summary-grid,
       .detail-grid,
-      .evidence-groups {
+      .evidence-list {
         grid-template-columns: 1fr;
       }
     }
@@ -563,12 +569,19 @@ export class ProcedureDetailPageComponent implements OnInit {
     }));
   }
 
-  protected generalEvidences(): Evidence[] {
+  protected initialEvidences(): Evidence[] {
     return this.evidences().filter((evidence) => !evidence.nodeId && !evidence.fieldName);
   }
 
-  protected taskEvidences(): Evidence[] {
-    return this.evidences().filter((evidence) => !!evidence.nodeId || !!evidence.fieldName);
+  protected taskAttachmentGroups(): Array<{ label: string; items: Evidence[] }> {
+    const groups = new Map<string, Evidence[]>();
+    this.evidences()
+      .filter((evidence) => !!evidence.nodeId || !!evidence.fieldName)
+      .forEach((evidence) => {
+        const key = evidence.nodeId || 'Tarea sin nodo';
+        groups.set(key, [...(groups.get(key) ?? []), evidence]);
+      });
+    return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
   }
 
   protected statusLabel(status: ProcedureStatus): string {
